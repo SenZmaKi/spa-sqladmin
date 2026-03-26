@@ -1,4 +1,5 @@
 import React from 'react'
+import ReactDOM from 'react-dom'
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
 
@@ -30,7 +31,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
   if (!open) return null
 
-  return (
+  return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in-0"
@@ -39,7 +40,8 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       <div className="relative z-50 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2">
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

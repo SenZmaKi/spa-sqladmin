@@ -786,6 +786,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-anyio" },
     { name = "python-dateutil" },
+    { name = "ruff", specifier = ">=0.15.4" },
     { name = "sqlalchemy-utils" },
     { name = "sqlmodel" },
 ]
