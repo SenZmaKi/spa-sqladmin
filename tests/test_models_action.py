@@ -9,9 +9,9 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.testclient import TestClient
 
-from sqladmin import Admin, ModelView
-from sqladmin.application import action
-from sqladmin.filters import AllUniqueStringValuesFilter, OperationColumnFilter
+from spa_sqladmin import Admin, ModelView
+from spa_sqladmin.application import action
+from spa_sqladmin.filters import AllUniqueStringValuesFilter, OperationColumnFilter
 from tests.common import sync_engine as engine
 
 Base: Any = declarative_base()
@@ -225,21 +225,43 @@ def test_model_action(client: TestClient) -> None:
         assert f"User: {user1.id}" in response.headers["X-Objs"]
         assert f"User: {user2.id}" in response.headers["X-Objs"]
 
-        response = client.get("/admin/user/list")
-        assert response.text.count("!Details Confirm?!") == 0
-        assert response.text.count("!List Confirm?!") == 1
-        assert response.text.count("!Details List Confirm?!") == 1
-        assert response.text.count("!Label Details Confirm?!") == 0
-        assert response.text.count("!Label List Confirm?!") == 1
-        assert response.text.count("!Label Details List Confirm?!") == 1
+        response = client.get("/admin/api/user/list")
+        assert response.status_code == 200
+        data = response.json()
+        actions_in_list = data["actions_in_list"]
+        action_confirmations = data["action_confirmations"]
+        # List-only and list+detail actions should be in actions_in_list
+        assert "list-confirm" in actions_in_list
+        assert "details-list-confirm" in actions_in_list
+        assert "label-list-confirm" in actions_in_list
+        assert "label-details-list-confirm" in actions_in_list
+        # Detail-only actions should NOT be in actions_in_list
+        assert "details-confirm" not in actions_in_list
+        assert "label-details-confirm" not in actions_in_list
+        # Confirmation messages for list actions should be present
+        assert action_confirmations["list-confirm"] == "!List Confirm?!"
+        assert action_confirmations["details-list-confirm"] == "!Details List Confirm?!"
+        assert action_confirmations["label-list-confirm"] == "!Label List Confirm?!"
+        assert action_confirmations["label-details-list-confirm"] == "!Label Details List Confirm?!"
 
-        response = client.get(f"/admin/user/details/{user1.id}")
-        assert response.text.count("!Details Confirm?!") == 1
-        assert response.text.count("!List Confirm?!") == 0
-        assert response.text.count("!Details List Confirm?!") == 1
-        assert response.text.count("!Label Details Confirm?!") == 1
-        assert response.text.count("!Label List Confirm?!") == 0
-        assert response.text.count("!Label Details List Confirm?!") == 1
+        response = client.get(f"/admin/api/user/detail/{user1.id}")
+        assert response.status_code == 200
+        data = response.json()
+        actions_in_detail = data["actions"]
+        action_confirmations = data["action_confirmations"]
+        # Detail-only and list+detail actions should be in actions_in_detail
+        assert "details-confirm" in actions_in_detail
+        assert "details-list-confirm" in actions_in_detail
+        assert "label-details-confirm" in actions_in_detail
+        assert "label-details-list-confirm" in actions_in_detail
+        # List-only actions should NOT be in actions_in_detail
+        assert "list-confirm" not in actions_in_detail
+        assert "label-list-confirm" not in actions_in_detail
+        # Confirmation messages for detail actions should be present
+        assert action_confirmations["details-confirm"] == "!Details Confirm?!"
+        assert action_confirmations["details-list-confirm"] == "!Details List Confirm?!"
+        assert action_confirmations["label-details-confirm"] == "!Label Details Confirm?!"
+        assert action_confirmations["label-details-list-confirm"] == "!Label Details List Confirm?!"
 
 
 def test_filter_processing_has_operator(client: TestClient) -> None:
@@ -250,13 +272,12 @@ def test_filter_processing_has_operator(client: TestClient) -> None:
         session.add_all([batman, superman])
         session.commit()
 
-        # Test with operation-based filter (has_operator=True)
-        response = client.get("/admin/user/list?name=bat&name_op=contains")
+        response = client.get("/admin/api/user/list?name=bat&name_op=contains")
         assert response.status_code == 200
-        # Check that batman is in the table content, not just anywhere on the page
-        assert "<td>batman</td>" in response.text
-        # Check that superman is not in the table content
-        assert "<td>superman</td>" not in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" not in names
 
 
 def test_filter_processing_without_operator(client: TestClient) -> None:
@@ -267,11 +288,12 @@ def test_filter_processing_without_operator(client: TestClient) -> None:
         session.add_all([batman, superman])
         session.commit()
 
-        # Test with simple filter (has_operator=False)
-        response = client.get("/admin/user/list?simple_name=batman")
+        response = client.get("/admin/api/user/list?simple_name=batman")
         assert response.status_code == 200
-        assert "<td>batman</td>" in response.text
-        assert "<td>superman</td>" not in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" not in names
 
 
 def test_filter_operation_edge_cases(client: TestClient) -> None:
@@ -283,30 +305,36 @@ def test_filter_operation_edge_cases(client: TestClient) -> None:
         session.commit()
 
         # Test with operation parameter but no value - should show all users
-        response = client.get("/admin/user/list?name_op=contains")
+        response = client.get("/admin/api/user/list?name_op=contains")
         assert response.status_code == 200
-        assert "<td>batman</td>" in response.text
-        assert "<td>superman</td>" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" in names
 
         # Test with value but no operation parameter - should show all users
-        response = client.get("/admin/user/list?name=batman")
+        response = client.get("/admin/api/user/list?name=batman")
         assert response.status_code == 200
-        assert "<td>batman</td>" in response.text
-        assert "<td>superman</td>" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" in names
 
         # Test with empty operation value
-        response = client.get("/admin/user/list?name=batman&name_op=")
+        response = client.get("/admin/api/user/list?name=batman&name_op=")
         assert response.status_code == 200
-        # Should show all users when operation is empty
-        assert "<td>batman</td>" in response.text
-        assert "<td>superman</td>" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" in names
 
         # Test with empty filter value
-        response = client.get("/admin/user/list?name=&name_op=contains")
+        response = client.get("/admin/api/user/list?name=&name_op=contains")
         assert response.status_code == 200
-        # Should show all users when value is empty
-        assert "<td>batman</td>" in response.text
-        assert "<td>superman</td>" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" in names
 
 
 def test_filter_mixed_types(client: TestClient) -> None:
@@ -319,8 +347,10 @@ def test_filter_mixed_types(client: TestClient) -> None:
         session.commit()
 
         # Test operation-based filter (ColumnFilter with has_operator=True)
-        response = client.get("/admin/user/list?name=man&name_op=contains")
+        response = client.get("/admin/api/user/list?name=man&name_op=contains")
         assert response.status_code == 200
-        assert "<td>batman</td>" in response.text
-        assert "<td>superman</td>" in response.text
-        assert "<td>joker</td>" not in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "batman" in names
+        assert "superman" in names
+        assert "joker" not in names

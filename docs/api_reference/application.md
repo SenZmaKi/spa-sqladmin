@@ -1,10 +1,10 @@
-::: sqladmin.application.Admin
+::: spa_sqladmin.application.Admin
     handler: python
     options:
       members:
         - __init__
 
-::: sqladmin.application.BaseAdmin
+::: spa_sqladmin.application.BaseAdmin
     handler: python
     options:
       members:
@@ -13,5 +13,5 @@
         - add_model_view
         - add_base_view
 
-::: sqladmin.application.action
+::: spa_sqladmin.application.action
     handler: python

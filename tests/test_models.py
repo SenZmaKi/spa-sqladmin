@@ -2,8 +2,6 @@ import enum
 from typing import Generator
 
 import pytest
-from jinja2 import TemplateNotFound
-from markupsafe import Markup
 from sqlalchemy import Boolean, Column, Enum, ForeignKey, Integer, String, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import (
@@ -17,12 +15,12 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
-from sqladmin import Admin, ModelView, expose
-from sqladmin.exceptions import InvalidModelError
-from sqladmin.filters import (
+from spa_sqladmin import Admin, ModelView, expose
+from spa_sqladmin.exceptions import InvalidModelError
+from spa_sqladmin.filters import (
     AllUniqueStringValuesFilter,
 )
-from sqladmin.helpers import get_column_python_type
+from spa_sqladmin.helpers import get_column_python_type
 from tests.common import sync_engine as engine
 
 pytestmark = pytest.mark.anyio
@@ -232,11 +230,11 @@ async def test_column_formatters_default() -> None:
 
     assert await ProfileAdmin().get_list_value(profile, "is_active") == (
         True,
-        Markup("<i class='fa fa-check text-success'></i>"),
+        "Yes",
     )
     assert await ProfileAdmin().get_detail_value(profile, "is_active") == (
         True,
-        Markup("<i class='fa fa-check text-success'></i>"),
+        "Yes",
     )
 
 
@@ -578,15 +576,15 @@ def test_search_query() -> None:
 
 
 def test_expose_decorator(client: TestClient) -> None:
+    from starlette.responses import JSONResponse
+
     class UserAdmin(ModelView, model=User):
         @expose("/profile/{pk}")
         async def profile(self, request: Request):
-            user: User = await self.get_object_for_edit(request)
-            return await self.templates.TemplateResponse(
-                request, "user.html", {"user": user}
-            )
+            return JSONResponse({"exposed": True})
 
     admin.add_view(UserAdmin)
 
-    with pytest.raises(TemplateNotFound, match="user.html"):
-        client.get("/admin/user/profile/1")
+    response = client.get("/admin/user/profile/1")
+    assert response.status_code == 200
+    assert response.json() == {"exposed": True}

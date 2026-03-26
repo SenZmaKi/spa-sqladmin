@@ -4,15 +4,16 @@ import pytest
 from sqlalchemy.orm import declarative_base
 from starlette.applications import Starlette
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.testclient import TestClient
 
-from sqladmin import Admin, BaseView, expose
+from spa_sqladmin import Admin, BaseView, expose
 from tests.common import sync_engine as engine
 
 Base = declarative_base()  # type: ignore
 
 app = Starlette()
-admin = Admin(app=app, engine=engine, templates_dir="tests/templates")
+admin = Admin(app=app, engine=engine)
 
 
 class CustomAdmin(BaseView):
@@ -21,11 +22,11 @@ class CustomAdmin(BaseView):
 
     @expose("/custom", methods=["GET"])
     async def custom(self, request: Request):
-        return await self.templates.TemplateResponse(request, "custom.html")
+        return JSONResponse({"page": "custom"})
 
     @expose("/custom/report")
     async def custom_report(self, request: Request):
-        return await self.templates.TemplateResponse(request, "custom.html")
+        return JSONResponse({"page": "custom_report"})
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ def test_base_view(client: TestClient) -> None:
     response = client.get("/admin/custom")
 
     assert response.status_code == 200
-    assert "<p>Here I'm going to display some data.</p>" in response.text
+    assert response.json() == {"page": "custom"}
 
     response = client.get("/admin/custom/report")
     assert response.status_code == 200

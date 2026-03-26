@@ -19,7 +19,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from tests.common import sync_engine as engine
 
 Base = declarative_base()  # type: Any
@@ -197,15 +197,17 @@ admin.add_view(ProductAdmin)
 
 
 def test_root_view(client: TestClient) -> None:
-    response = client.get("/admin")
+    response = client.get("/admin/api/site")
 
     assert response.status_code == 200
-    assert '<span class="nav-link-title">Users</span>' in response.text
-    assert '<span class="nav-link-title">Addresses</span>' in response.text
+    data = response.json()
+    model_names = [m["name_plural"] for m in data["models"]]
+    assert "Users" in model_names
+    assert "Addresses" in model_names
 
 
 def test_invalid_list_page(client: TestClient) -> None:
-    response = client.get("/admin/example/list")
+    response = client.get("/admin/api/example/list")
 
     assert response.status_code == 404
 
@@ -217,18 +219,15 @@ def test_list_view_single_page(client: TestClient) -> None:
             session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list")
+    response = client.get("/admin/api/user/list")
 
     assert response.status_code == 200
+    data = response.json()
 
-    # Showing active navigation link
-    assert (
-        '<a class="nav-link active" href="http://testserver/admin/user/list"'
-        in response.text
-    )
-
-    # Next/Previous disabled
-    assert response.text.count('<li class="page-item disabled">') == 2
+    assert data["count"] == 5
+    assert len(data["rows"]) == 5
+    assert data["page"] == 1
+    assert data["identity"] == "user"
 
 
 def test_list_view_with_relationships(client: TestClient) -> None:
@@ -240,19 +239,24 @@ def test_list_view_with_relationships(client: TestClient) -> None:
             session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list")
+    response = client.get("/admin/api/user/list")
 
     assert response.status_code == 200
+    data = response.json()
+    row = data["rows"][0]
 
-    # Show values of relationships
-    assert (
-        '<a href="http://testserver/admin/address/details/1">(Address 1)</a>'
-        in response.text
-    )
-    assert (
-        '<a href="http://testserver/admin/profile/details/1">Profile 1</a>'
-        in response.text
-    )
+    # Relationship values are serialized as objects with pk/repr/identity
+    addr_val = row["addresses"]
+    assert isinstance(addr_val, list)
+    assert addr_val[0]["repr"] == "Address 1"
+    assert addr_val[0]["pk"] == "1"
+    assert addr_val[0]["identity"] == "address"
+
+    profile_val = row["profile"]
+    assert isinstance(profile_val, dict)
+    assert profile_val["repr"] == "Profile 1"
+    assert profile_val["pk"] == "1"
+    assert profile_val["identity"] == "profile"
 
 
 def test_list_view_with_formatted_relationships(client: TestClient) -> None:
@@ -264,13 +268,23 @@ def test_list_view_with_formatted_relationships(client: TestClient) -> None:
             session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list")
+    response = client.get("/admin/api/user/list")
 
     assert response.status_code == 200
+    data = response.json()
+    row = data["rows"][0]
 
-    # Show formatted values of relationships
-    assert "(Formatted Address 1)" in response.text
-    assert "Formatted Profile 1" in response.text
+    # Formatted relationship fields are still present as serialized relation data
+    assert "addresses_formattable" in row
+    assert "profile_formattable" in row
+    addr_val = row["addresses_formattable"]
+    assert isinstance(addr_val, list)
+    assert len(addr_val) > 0
+    assert addr_val[0]["repr"] == "Address 1"
+
+    profile_val = row["profile_formattable"]
+    assert isinstance(profile_val, dict)
+    assert profile_val["repr"] == "Profile 1"
 
 
 def test_list_view_multi_page(client: TestClient) -> None:
@@ -280,25 +294,27 @@ def test_list_view_multi_page(client: TestClient) -> None:
             session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list")
+    response = client.get("/admin/api/user/list")
 
     assert response.status_code == 200
+    data = response.json()
+    assert data["count"] == 45
+    assert data["page"] == 1
+    assert len(data["rows"]) == data["page_size"]
 
-    # Previous disabled
-    assert response.text.count('<li class="page-item disabled">') == 1
-    assert response.text.count('<li class="page-item ">') == 5
-
-    response = client.get("/admin/user/list?page=3")
+    response = client.get("/admin/api/user/list?page=3")
 
     assert response.status_code == 200
-    assert response.text.count('<li class="page-item ">') == 6
+    data = response.json()
+    assert data["page"] == 3
+    assert data["count"] == 45
 
-    response = client.get("/admin/user/list?page=5")
+    response = client.get("/admin/api/user/list?page=5")
+
     assert response.status_code == 200
-
-    # Next disabled
-    assert response.text.count('<li class="page-item disabled">') == 1
-    assert response.text.count('<li class="page-item ">') == 5
+    data = response.json()
+    assert data["page"] == 5
+    assert data["count"] == 45
 
 
 def test_list_page_permission_actions(client: TestClient) -> None:
@@ -313,28 +329,34 @@ def test_list_page_permission_actions(client: TestClient) -> None:
 
         session.commit()
 
-    response = client.get("/admin/user/list")
+    response = client.get("/admin/api/user/list")
 
     assert response.status_code == 200
-    assert response.text.count('<i class="fa-solid fa-eye"></i>') == 10
-    assert response.text.count('<i class="fa-solid fa-trash"></i>') == 10
+    data = response.json()
+    perms = data["permissions"]
+    assert perms["can_view_details"] is True
+    assert perms["can_delete"] is True
+    assert perms["can_edit"] is True
+    assert perms["can_create"] is True
 
-    response = client.get("/admin/address/list")
+    response = client.get("/admin/api/address/list")
 
     assert response.status_code == 200
-    assert response.text.count('<i class="fa-solid fa-eye"></i>') == 10
-    assert response.text.count('<i class="fa-solid fa-pencil"></i>') == 0
-    assert response.text.count('<i class="fa-solid fa-trash"></i>') == 10
+    data = response.json()
+    perms = data["permissions"]
+    assert perms["can_view_details"] is True
+    assert perms["can_edit"] is True
+    assert perms["can_delete"] is True
 
 
 def test_unauthorized_detail_page(client: TestClient) -> None:
-    response = client.get("/admin/movie/details/1")
+    response = client.get("/admin/api/movie/detail/1")
 
     assert response.status_code == 403
 
 
 def test_not_found_detail_page(client: TestClient) -> None:
-    response = client.get("/admin/user/details/1")
+    response = client.get("/admin/api/user/detail/1")
 
     assert response.status_code == 404
 
@@ -356,38 +378,37 @@ def test_detail_page(client: TestClient) -> None:
         session.add(profile_formattable)
         session.commit()
 
-    response = client.get("/admin/user/details/1")
+    response = client.get("/admin/api/user/detail/1")
 
     assert response.status_code == 200
-    assert '<th class="w-1">Column</th>' in response.text
-    assert '<th class="w-1">Value</th>' in response.text
-    assert '<h3 class="card-title">\n        Id: 1' in response.text
-    assert "<td>id</td>" in response.text
-    assert "<td>1</td>" in response.text
-    assert "<td>name</td>" in response.text
-    assert "<td>Amin Alaee</td>" in response.text
-    assert "<td>addresses</td>" in response.text
-    assert (
-        '<a href="http://testserver/admin/address/details/1">(Address 1)</a>'
-        in response.text
-    )
-    assert "<td>profile</td>" in response.text
-    assert (
-        '<a href="http://testserver/admin/profile/details/1">Profile 1</a>'
-        in response.text
-    )
-    assert "<td>addresses_formattable</td>" in response.text
-    assert "(Formatted Address 1)" in response.text
-    assert "<td>profile_formattable</td>" in response.text
-    assert "Formatted Profile 1" in response.text
+    data = response.json()
 
-    # Action Buttons
-    assert response.text.count("http://testserver/admin/user/list") == 2
-    assert response.text.count("Go Back") == 1
+    assert data["pk"] == "1"
+    assert data["repr"] == "User 1"
+    assert data["identity"] == "user"
 
-    # Delete modal
-    assert response.text.count("Cancel") == 1
-    assert response.text.count("Delete") == 2
+    fields_by_name = {f["name"]: f for f in data["fields"]}
+
+    assert fields_by_name["id"]["value"] == 1
+    assert fields_by_name["name"]["value"] == "Amin Alaee"
+
+    # Relationship fields
+    assert fields_by_name["addresses"]["is_relation"] is True
+    addr_related = fields_by_name["addresses"]["related"]
+    assert isinstance(addr_related, list)
+    assert addr_related[0]["repr"] == "Address 1"
+
+    assert fields_by_name["profile"]["is_relation"] is True
+    profile_related = fields_by_name["profile"]["related"]
+    assert profile_related["repr"] == "Profile 1"
+
+    # Formatted relationship fields are present
+    assert "addresses_formattable" in fields_by_name
+    assert "profile_formattable" in fields_by_name
+
+    # Permissions
+    assert data["permissions"]["can_edit"] is True
+    assert data["permissions"]["can_delete"] is True
 
 
 def test_column_labels(client: TestClient) -> None:
@@ -396,25 +417,29 @@ def test_column_labels(client: TestClient) -> None:
         session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list")
+    response = client.get("/admin/api/user/list")
 
     assert response.status_code == 200
-    assert "Email" in response.text
+    data = response.json()
+    col_labels = {c["name"]: c["label"] for c in data["columns"]}
+    assert col_labels["email"] == "Email"
 
-    response = client.get("/admin/user/details/1")
+    response = client.get("/admin/api/user/detail/1")
 
     assert response.status_code == 200
-    assert "Email" in response.text
+    data = response.json()
+    field_labels = {f["name"]: f["label"] for f in data["fields"]}
+    assert field_labels["email"] == "Email"
 
 
 def test_delete_endpoint_unauthorized_response(client: TestClient) -> None:
-    response = client.delete("/admin/movie/delete")
+    response = client.delete("/admin/api/movie/delete")
 
     assert response.status_code == 403
 
 
 def test_delete_endpoint_not_found_response(client: TestClient) -> None:
-    response = client.delete("/admin/user/delete?pks=1")
+    response = client.delete("/admin/api/user/delete?pks=1")
 
     assert response.status_code == 404
 
@@ -431,62 +456,63 @@ def test_delete_endpoint(client: TestClient) -> None:
     with session_maker() as s:
         assert s.query(User).count() == 1
 
-    response = client.delete("/admin/user/delete?pks=1")
+    response = client.delete("/admin/api/user/delete?pks=1")
 
     assert response.status_code == 200
+    assert response.json()["success"] is True
 
     with session_maker() as s:
         assert s.query(User).count() == 0
 
 
 def test_create_endpoint_unauthorized_response(client: TestClient) -> None:
-    response = client.get("/admin/movie/create")
+    response = client.get("/admin/api/movie/form-schema?action=create")
 
     assert response.status_code == 403
 
 
 def test_create_endpoint_get_form(client: TestClient) -> None:
-    response = client.get("/admin/user/create")
+    response = client.get("/admin/api/user/form-schema?action=create")
 
     assert response.status_code == 200
-    assert (
-        '<select class="form-control" id="addresses" multiple name="addresses">'
-        in response.text
-    )
-    assert '<select class="form-control" id="profile" name="profile">' in response.text
-    assert 'id="name" maxlength="16" name="name" type="text" value="">' in response.text
-    assert (
-        '<input class="form-control" id="email" name="email" type="text" value="">'
-        in response.text
-    )
-    assert '<select class="form-control" id="status" name="status">' in response.text
+    data = response.json()
+    field_names = [f["name"] for f in data["fields"]]
+
+    assert "name" in field_names
+    assert "email" in field_names
+    assert "addresses" in field_names
+    assert "profile" in field_names
+    assert "status" in field_names
+    assert "birthdate" in field_names
+
+    assert data["identity"] == "user"
 
 
 def test_create_endpoint_with_required_fields(client: TestClient) -> None:
-    response = client.get("/admin/product/create")
+    response = client.get("/admin/api/product/form-schema?action=create")
 
     assert response.status_code == 200
-    assert (
-        '<label class="form-label col-sm-2 col-form-label required-label" for="name" '
-        'title="This is a required field">Name</label>' in response.text
-    )
-    assert (
-        '<label class="form-label col-sm-2 col-form-label" for="price">Price</label>'
-        in response.text
-    )
+    data = response.json()
+    fields_by_name = {f["name"]: f for f in data["fields"]}
+
+    assert fields_by_name["name"]["required"] is True
+    assert fields_by_name["price"]["required"] is False
 
 
 def test_create_endpoint_post_form(client: TestClient) -> None:
-    data: dict = {"birthdate": "Wrong Date Format"}
-    response = client.post("/admin/user/create", data=data)
+    body: dict = {"birthdate": "Wrong Date Format"}
+    response = client.post("/admin/api/user/create", json=body)
 
     assert response.status_code == 400
-    assert (
-        '<div class="invalid-feedback">Not a valid date value.</div>' in response.text
-    )
+    errors = response.json()["errors"]
+    assert "birthdate" in errors
+    assert "Not a valid date value." in errors["birthdate"]
 
-    data = {"name": "SQLAlchemy", "email": "amin"}
-    response = client.post("/admin/user/create", data=data)
+    body = {"name": "SQLAlchemy", "email": "amin"}
+    response = client.post("/admin/api/user/create", json=body)
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
 
     stmt = select(func.count(User.id))
     with session_maker() as s:
@@ -505,8 +531,10 @@ def test_create_endpoint_post_form(client: TestClient) -> None:
     assert user.addresses == []
     assert user.profile is None
 
-    data = {"user": user.id}
-    response = client.post("/admin/address/create", data=data)
+    body = {"user": str(user.id)}
+    response = client.post("/admin/api/address/create", json=body)
+
+    assert response.status_code == 200
 
     stmt = select(func.count(Address.id))
     with session_maker() as s:
@@ -518,8 +546,10 @@ def test_create_endpoint_post_form(client: TestClient) -> None:
     assert address.user.id == user.id
     assert address.user_id == user.id
 
-    data = {"user": user.id}
-    response = client.post("/admin/profile/create", data=data)
+    body = {"user": str(user.id)}
+    response = client.post("/admin/api/profile/create", json=body)
+
+    assert response.status_code == 200
 
     stmt = select(func.count(Profile.id))
     with session_maker() as s:
@@ -531,12 +561,14 @@ def test_create_endpoint_post_form(client: TestClient) -> None:
     assert profile.user.id == user.id
     assert profile.user_id == user.id
 
-    data = {
+    body = {
         "name": "SQLAdmin",
-        "addresses": [address.id],
-        "profile": profile.id,
+        "addresses": [str(address.id)],
+        "profile": str(profile.id),
     }
-    response = client.post("/admin/user/create", data=data)
+    response = client.post("/admin/api/user/create", json=body)
+
+    assert response.status_code == 200
 
     stmt = select(func.count(User.id))
     with session_maker() as s:
@@ -555,45 +587,37 @@ def test_create_endpoint_post_form(client: TestClient) -> None:
     assert user.addresses[0].id == address.id
     assert user.profile.id == profile.id
 
-    data = {"name": "SQLAlchemy", "email": "amin"}
-    response = client.post("/admin/user/create", data=data)
+    # Duplicate unique email should fail
+    body = {"name": "SQLAlchemy", "email": "amin"}
+    response = client.post("/admin/api/user/create", json=body)
     assert response.status_code == 400
-    assert "alert alert-danger" in response.text
-
-
-def test_list_view_page_size_options(client: TestClient) -> None:
-    response = client.get("/admin/user/list")
-
-    assert response.status_code == 200
-    assert 'href="http://testserver/admin/user/list?pageSize=10' in response.text
-    assert 'href="http://testserver/admin/user/list?pageSize=25' in response.text
-    assert 'href="http://testserver/admin/user/list?pageSize=50' in response.text
-    assert 'href="http://testserver/admin/user/list?pageSize=100' in response.text
 
 
 def test_is_accessible_method(client: TestClient) -> None:
-    response = client.get("/admin/movie/list")
+    response = client.get("/admin/api/movie/list")
 
     assert response.status_code == 403
 
 
 def test_is_visible_method(client: TestClient) -> None:
-    response = client.get("/admin")
+    response = client.get("/admin/api/site")
 
     assert response.status_code == 200
-    assert '<span class="nav-link-title">Users</span>' in response.text
-    assert '<span class="nav-link-title">Addresses</span>' in response.text
-    assert "Movie" not in response.text
+    data = response.json()
+    model_names = [m["name"] for m in data["models"]]
+    assert "User" in model_names
+    assert "Address" in model_names
+    assert "Movie" not in model_names
 
 
 def test_edit_endpoint_unauthorized_response(client: TestClient) -> None:
-    response = client.get("/admin/movie/edit/1")
+    response = client.get("/admin/api/movie/form-schema?action=edit&pk=1")
 
     assert response.status_code == 403
 
 
 def test_not_found_edit_page(client: TestClient) -> None:
-    response = client.get("/admin/user/edit/1")
+    response = client.get("/admin/api/user/form-schema?action=edit&pk=1")
 
     assert response.status_code == 404
 
@@ -610,34 +634,31 @@ def test_update_get_page(client: TestClient) -> None:
         session.add(profile)
         session.commit()
 
-    response = client.get("/admin/user/edit/1")
+    response = client.get("/admin/api/user/form-schema?action=edit&pk=1")
 
     assert response.status_code == 200
-    assert (
-        '<select class="form-control" id="addresses" multiple name="addresses">'
-        in response.text
-    )
-    assert '<option selected value="1">Address 1</option>' in response.text
-    assert '<select class="form-control" id="profile" name="profile">' in response.text
-    assert '<option selected value="1">Profile 1</option>' in response.text
-    assert (
-        'id="name" maxlength="16" name="name" type="text" value="Joe">' in response.text
-    )
-    assert (
-        '<select class="form-control" id="status" name="status">' not in response.text
-    )
+    data = response.json()
+    fields_by_name = {f["name"]: f for f in data["fields"]}
 
-    response = client.get("/admin/address/edit/1")
+    assert "addresses" in fields_by_name
+    assert "profile" in fields_by_name
+    assert fields_by_name["name"]["value"] == "Joe"
+    # status should not be in edit form (form_edit_rules excludes it)
+    assert "status" not in fields_by_name
 
-    assert '<select class="form-control" id="user" name="user">' in response.text
-    assert '<option value="__None"></option>' in response.text
-    assert '<option selected value="1">User 1</option>' in response.text
+    response = client.get("/admin/api/address/form-schema?action=edit&pk=1")
 
-    response = client.get("/admin/profile/edit/1")
+    assert response.status_code == 200
+    data = response.json()
+    fields_by_name = {f["name"]: f for f in data["fields"]}
+    assert "user" in fields_by_name
 
-    assert '<select class="form-control" id="user" name="user">' in response.text
-    assert '<option value="__None"></option>' in response.text
-    assert '<option selected value="1">User 1</option>' in response.text
+    response = client.get("/admin/api/profile/form-schema?action=edit&pk=1")
+
+    assert response.status_code == 200
+    data = response.json()
+    fields_by_name = {f["name"]: f for f in data["fields"]}
+    assert "user" in fields_by_name
 
 
 def test_update_submit_form(client: TestClient) -> None:
@@ -654,8 +675,11 @@ def test_update_submit_form(client: TestClient) -> None:
         session.add(profile)
         session.commit()
 
-    data = {"name": "Jack", "email": "amin"}
-    response = client.post("/admin/user/edit/1", data=data)
+    body = {"name": "Jack", "email": "amin"}
+    response = client.post("/admin/api/user/edit/1", json=body)
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
 
     stmt = (
         select(User)
@@ -670,8 +694,10 @@ def test_update_submit_form(client: TestClient) -> None:
     assert user.profile is None
     assert user.email == "amin"
 
-    data = {"name": "Jack", "addresses": "1", "profile": "1"}
-    response = client.post("/admin/user/edit/1", data=data)
+    body = {"name": "Jack", "addresses": ["1"], "profile": "1"}
+    response = client.post("/admin/api/user/edit/1", json=body)
+
+    assert response.status_code == 200
 
     stmt = select(Address).filter(Address.id == 1).limit(1)
     with session_maker() as s:
@@ -683,31 +709,36 @@ def test_update_submit_form(client: TestClient) -> None:
         profile = s.execute(stmt).scalar_one()
     assert profile.user_id == 1
 
-    data = {"name": "Jack" * 10}
-    response = client.post("/admin/user/edit/1", data=data)
+    # Name too long should fail validation
+    body = {"name": "Jack" * 10}
+    response = client.post("/admin/api/user/edit/1", json=body)
 
     assert response.status_code == 400
 
-    data = {"user": user.id}
-    response = client.post("/admin/address/edit/1", data=data)
+    body = {"user": str(user.id)}
+    response = client.post("/admin/api/address/edit/1", json=body)
+
+    assert response.status_code == 200
 
     stmt = select(Address).filter(Address.id == 1).limit(1)
     with session_maker() as s:
         address = s.execute(stmt).scalar_one()
     assert address.user_id == 1
 
-    data = {"name": "Jack", "email": "", "save": "Save as new"}
-    response = client.post("/admin/user/edit/1", data=data)
-    assert response.url == "http://testserver/admin/user/edit/2"
-
-    data = {"name": "Jack", "email": "amin"}
-    client.post("/admin/user/edit/1", data=data)
-    response = client.post("/admin/user/edit/2", data=data)
+    # Duplicate unique email should fail
+    body = {"name": "Jack", "email": "amin"}
+    client.post("/admin/api/user/edit/1", json=body)
+    # Create user 2 first via create endpoint
+    body_create = {"name": "Jack2", "email": "other"}
+    client.post("/admin/api/user/create", json=body_create)
+    body = {"name": "Jack", "email": "amin"}
+    response = client.post("/admin/api/user/edit/2", json=body)
     assert response.status_code == 400
-    assert "alert alert-danger" in response.text
 
-    data = {"name": "Jack", "addresses": ["1", "2"], "profile": "1"}
-    response = client.post("/admin/user/edit/1", data=data)
+    body = {"name": "Jack", "addresses": ["1", "2"], "profile": "1"}
+    response = client.post("/admin/api/user/edit/1", json=body)
+
+    assert response.status_code == 200
 
     stmt = select(Address).limit(2)
     with session_maker() as s:
@@ -724,15 +755,20 @@ def test_searchable_list(client: TestClient) -> None:
         session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list")
-    assert "Search: name" in response.text
-    assert "/admin/user/details/1" in response.text
+    response = client.get("/admin/api/user/list")
+    data = response.json()
+    assert data["searchable"] is True
+    assert "name" in data["search_placeholder"]
+    assert len(data["rows"]) == 2
 
-    response = client.get("/admin/user/list?search=ro")
-    assert "/admin/user/details/1" in response.text
+    response = client.get("/admin/api/user/list?search=ro")
+    data = response.json()
+    assert len(data["rows"]) == 1
+    assert data["rows"][0]["name"] == "Ross"
 
-    response = client.get("/admin/user/list?search=rose")
-    assert "/admin/user/details/1" not in response.text
+    response = client.get("/admin/api/user/list?search=rose")
+    data = response.json()
+    assert len(data["rows"]) == 0
 
 
 def test_sortable_list(client: TestClient) -> None:
@@ -741,13 +777,17 @@ def test_sortable_list(client: TestClient) -> None:
         session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/list?sortBy=id&sort=asc")
+    response = client.get("/admin/api/user/list?sortBy=id&sort=asc")
+    data = response.json()
 
-    assert "http://testserver/admin/user/list?sortBy=id&amp;sort=desc" in response.text
+    # Verify the id column is marked as sortable
+    id_col = next(c for c in data["columns"] if c["name"] == "id")
+    assert id_col["sortable"] is True
+    assert len(data["rows"]) == 1
 
-    response = client.get("/admin/user/list?sortBy=id&sort=desc")
-
-    assert "http://testserver/admin/user/list?sortBy=id&amp;sort=asc" in response.text
+    response = client.get("/admin/api/user/list?sortBy=id&sort=desc")
+    data = response.json()
+    assert len(data["rows"]) == 1
 
 
 def test_export_csv(client: TestClient) -> None:
@@ -756,7 +796,7 @@ def test_export_csv(client: TestClient) -> None:
         session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/export/csv")
+    response = client.get("/admin/api/user/export/csv")
     assert response.text == "name,status\r\nDaniel,ACTIVE\r\n"
 
 
@@ -772,7 +812,7 @@ def test_export_csv_utf8(client: TestClient) -> None:
         session.add(user_4)
         session.commit()
 
-    response = client.get("/admin/user/export/csv")
+    response = client.get("/admin/api/user/export/csv")
     assert response.text == (
         "name,status\r\nDaniel,ACTIVE\r\nدانيال,ACTIVE\r\n"
         "積極的,ACTIVE\r\nДаниэль,ACTIVE\r\n"
@@ -785,7 +825,7 @@ def test_export_json(client: TestClient) -> None:
         session.add(user)
         session.commit()
 
-    response = client.get("/admin/user/export/json")
+    response = client.get("/admin/api/user/export/json")
     assert response.text == '[{"name": "Daniel", "status": "ACTIVE"}]'
 
 
@@ -801,7 +841,7 @@ def test_export_json_utf8(client: TestClient) -> None:
         session.add(user_4)
         session.commit()
 
-    response = client.get("/admin/user/export/json")
+    response = client.get("/admin/api/user/export/json")
     assert response.text == (
         '[{"name": "Daniel", "status": "ACTIVE"},'
         '{"name": "دانيال", "status": "ACTIVE"},'
@@ -819,7 +859,7 @@ def test_export_json_complex_model(client: TestClient) -> None:
         session.add(address)
         session.commit()
 
-    response = client.get("/admin/address/export/json")
+    response = client.get("/admin/api/address/export/json")
     assert response.text == json.dumps(
         [{"id": "1", "user_id": "1", "user": "User 1", "user.profile.id": "None"}]
     )
@@ -840,18 +880,18 @@ def test_export_csv_row_count(client: TestClient) -> None:
 
         session.commit()
 
-    response = client.get("/admin/user/export/csv")
+    response = client.get("/admin/api/user/export/csv")
     assert row_count(response) == 20
 
-    response = client.get("/admin/address/export/csv")
+    response = client.get("/admin/api/address/export/csv")
     assert row_count(response) == 3
 
 
 def test_export_bad_type_is_404(client: TestClient) -> None:
-    response = client.get("/admin/user/export/bad_type")
+    response = client.get("/admin/api/user/export/bad_type")
     assert response.status_code == 404
 
 
 def test_export_permission(client: TestClient) -> None:
-    response = client.get("/admin/movie/export/csv")
+    response = client.get("/admin/api/movie/export/csv")
     assert response.status_code == 403

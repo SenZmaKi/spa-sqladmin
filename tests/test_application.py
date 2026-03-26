@@ -6,12 +6,10 @@ from sqlalchemy.orm import declarative_base
 from starlette.applications import Starlette
 from starlette.datastructures import MutableHeaders
 from starlette.middleware import Middleware
-from starlette.requests import Request
-from starlette.responses import Response
 from starlette.testclient import TestClient
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from tests.common import sync_engine as engine
 
 Base = declarative_base()  # type: ignore
@@ -45,8 +43,9 @@ def test_application_title() -> None:
         response = client.get("/admin")
 
     assert response.status_code == 200
-    assert "<h3>Admin</h3>" in response.text
-    assert "<title>Admin</title>" in response.text
+    # SPA serves index.html with admin config injected
+    assert "__ADMIN_CONFIG__" in response.text
+    assert "root" in response.text
 
 
 def test_application_logo() -> None:
@@ -62,10 +61,8 @@ def test_application_logo() -> None:
         response = client.get("/dashboard")
 
     assert response.status_code == 200
-    assert (
-        '<img src="https://example.com/logo.svg" width="64" height="64"'
-        in response.text
-    )
+    # SPA serves index.html with config (logo is in site API, not in HTML)
+    assert "__ADMIN_CONFIG__" in response.text
 
 
 def test_middlewares() -> None:
@@ -95,36 +92,6 @@ def test_middlewares() -> None:
     assert response.status_code == 200
     assert "x-correlation-id" in response.headers
 
-
-def test_get_save_redirect_url():
-    app = Starlette()
-    admin = Admin(app=app, engine=engine)
-
-    class UserAdmin(ModelView, model=User):
-        save_as = True
-
-    admin.add_view(UserAdmin)
-
-    @app.route("/{identity}", methods=["POST"])
-    async def index(request: Request):
-        obj = User(id=1)
-        form_data = await request.form()
-        url = admin.get_save_redirect_url(request, form_data, admin.views[0], obj)
-        return Response(str(url))
-
-    client = TestClient(app)
-
-    response = client.post("/user", data={"save": "Save"})
-    assert response.text == "http://testserver/admin/user/list"
-
-    response = client.post("/user", data={"save": "Save and continue editing"})
-    assert response.text == "http://testserver/admin/user/edit/1"
-
-    response = client.post("/user", data={"save": "Save as new"})
-    assert response.text == "http://testserver/admin/user/edit/1"
-
-    response = client.post("/user", data={"save": "Save and add another"})
-    assert response.text == "http://testserver/admin/user/create"
 
 
 def test_build_category_menu():
@@ -173,28 +140,11 @@ def test_validate_page_and_page_size():
 
     client = TestClient(app)
 
-    response = client.get("/admin/user/list?page=10000")
+    response = client.get("/admin/api/user/list?page=10000")
     assert response.status_code == 200
 
-    response = client.get("/admin/user/list?page=aaaa")
+    response = client.get("/admin/api/user/list?page=aaaa")
     assert response.status_code == 400
 
 
-def test_is_list_template_global():
-    """Test that is_list correctly identifies list and set types."""
-    app = Starlette()
-    admin = Admin(app=app, engine=engine)
 
-    is_list = admin.templates.env.globals["is_list"]
-
-    # Should return True for list and set
-    assert is_list([1, 2, 3]) is True
-    assert is_list({1, 2, 3}) is True
-    assert is_list([]) is True
-    assert is_list(set()) is True
-
-    # Should return False for non-collection types
-    assert is_list("string") is False
-    assert is_list(123) is False
-    assert is_list(None) is False
-    assert is_list({"key": "value"}) is False

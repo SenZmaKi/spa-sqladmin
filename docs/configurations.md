@@ -45,7 +45,7 @@ If you want to integrate SQLAdmin into FastAPI application:
 
 ```python
 from fastapi import FastAPI
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 
 
 app = FastAPI()
@@ -58,6 +58,88 @@ class UserAdmin(ModelView, model=User):
 
 admin.add_view(UserAdmin)
 ```
+
+## Admin Branding
+
+### Title
+
+Set the browser tab title and sidebar heading:
+
+```python
+admin = Admin(app, engine, title="My App Admin")
+```
+
+### Logo
+
+Pass any image URL (including SVG data URLs) as `logo_url`. It is displayed in the
+top-left of the sidebar instead of the default icon + title text.
+
+```python
+import base64
+
+_LOGO_SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">...</svg>'
+LOGO_URL = f"data:image/svg+xml;base64,{base64.b64encode(_LOGO_SVG).decode()}"
+
+admin = Admin(app, engine, logo_url=LOGO_URL)
+```
+
+### Favicon
+
+Set a custom browser-tab favicon:
+
+```python
+admin = Admin(app, engine, favicon_url="https://example.com/favicon.ico")
+```
+
+SVG data URLs work too — useful for keeping everything self-contained:
+
+```python
+_FAVICON_SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">...</svg>'
+FAVICON_URL = f"data:image/svg+xml;base64,{base64.b64encode(_FAVICON_SVG).decode()}"
+admin = Admin(app, engine, favicon_url=FAVICON_URL)
+```
+
+## Color Palette
+
+Consumers can supply a `color_palette` dict to override the default theme colors
+for both light and dark mode. Only the variables you provide are overridden; the
+rest fall back to the built-in defaults.
+
+Values must be space-separated HSL components (matching Tailwind CSS variable format,
+e.g. `"239 84% 67%"` not `"hsl(239, 84%, 67%)"`).
+
+Available variable names correspond to the CSS custom properties defined in
+`globals.css`: `background`, `foreground`, `card`, `popover`, `primary`,
+`primary-foreground`, `secondary`, `muted`, `accent`, `destructive`, `border`,
+`input`, `ring`, `radius`.
+
+```python
+admin = Admin(
+    app,
+    engine,
+    color_palette={
+        "light": {
+            "primary": "239 84% 67%",           # indigo-500
+            "primary-foreground": "0 0% 100%",
+            "ring": "239 84% 67%",
+        },
+        "dark": {
+            "primary": "243 75% 70%",           # softer indigo for dark bg
+            "primary-foreground": "0 0% 100%",
+            "ring": "243 75% 70%",
+        },
+    },
+)
+```
+
+## Dark / Light / System Mode
+
+The admin UI includes a theme switcher button in the top-right header
+(Monitor → Sun → Moon → cycle). The chosen mode is automatically persisted to
+`localStorage` via Zustand so it survives page reloads. The default mode is
+`"system"` which follows the OS preference.
+
+No backend configuration is required for this feature.
 
 As you can see the `UserAdmin` class inherits from `ModelView` and accepts some configurations.
 
@@ -142,7 +224,7 @@ The options available are:
 
 ### ColumnFilter
 A ColumnFilter is a class that defines a filter for a column. A few standard filters are
-implemented in the `sqladmin.filters` module. Below is an example of a generic ColumnFilter. Note
+implemented in the `spa_sqladmin.filters` module. Below is an example of a generic ColumnFilter. Note
 that the fields `title` and `parameter_name`, and the methods `lookups` and `get_filtered_query`
 are all required in a filter class.
 
@@ -190,7 +272,7 @@ The following built in column filters are available. All filters have a default 
 Here is an example of how to use BooleanFilter, AllUniqueStringValuesFilter, ForeignKeyFilter, and OperationColumnFilter:
 
 ```python
-from sqladmin.filters import BooleanFilter, AllUniqueStringValuesFilter, ForeignKeyFilter, OperationColumnFilter
+from spa_sqladmin.filters import BooleanFilter, AllUniqueStringValuesFilter, ForeignKeyFilter, OperationColumnFilter
 
 class User(Base):
     __tablename__ = "users"
@@ -414,33 +496,6 @@ class ExamResultAdmin(ModelView, model=ExamResult):
 ```
 
 
-
-
-## Templates
-
-The template files are built using Jinja2 and can be completely overridden in the configurations.
-The pages available are:
-
-- `list_template`: Template to use for models list page. Default is `sqladmin/list.html`.
-- `create_template`: Template to use for model creation page. Default is `sqladmin/create.html`.
-- `details_template`: Template to use for model details page. Default is `sqladmin/details.html`.
-- `edit_template`: Template to use for model edit page. Default is `sqladmin/edit.html`.
-
-!!! example
-
-    ```python
-    class UserAdmin(ModelView, model=User):
-        list_template = "custom_list.html"
-    ```
-
-For more information about working with template see [Working with Templates](./working_with_templates.md).
-
-## Template configurations
-
-The following options are available to configure the templates:
-
-* `show_compact_lists`: If `False`, the list of objects will be displayed in a separate line for each object. Default is `True`.
-
 ## Events
 
 There might be some cases which you want to do some actions
@@ -475,7 +530,7 @@ To add custom action on models to the Admin, you can use the `action` decorator.
 !!! example
 
     ```python
-    from sqladmin import BaseView, action
+    from spa_sqladmin import BaseView, action
     from starlette.responses import RedirectResponse
 
     class UserAdmin(ModelView, model=User):

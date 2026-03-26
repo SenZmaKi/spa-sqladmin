@@ -9,7 +9,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from tests.common import sync_engine as engine
 
 Base = declarative_base()  # type: Any
@@ -53,17 +53,17 @@ def _query_user() -> User:
 
 
 def test_create_form_fields(client: TestClient) -> None:
-    response = client.get("/admin/user/create")
+    response = client.get("/admin/api/user/form-schema")
 
     assert response.status_code == 200
-    assert (
-        '<input class="form-control" id="file" name="file" required type="file">'
-        in response.text
-    )
-    assert (
-        '<input class="form-control" id="optional_file" name="optional_file" type="file">'  # noqa: E501
-        in response.text
-    )
+    data = response.json()
+    field_names = {f["name"]: f for f in data["fields"]}
+    assert "file" in field_names
+    assert field_names["file"]["type"] == "file"
+    assert field_names["file"]["required"] is True
+    assert "optional_file" in field_names
+    assert field_names["optional_file"]["type"] == "file"
+    assert field_names["optional_file"]["required"] is False
 
 
 def test_create_form_post(client: TestClient) -> None:
@@ -71,7 +71,9 @@ def test_create_form_post(client: TestClient) -> None:
         "file": ("file.txt", b"abc"),
         "optional_file": ("optional_file.txt", b"cdb"),
     }
-    client.post("/admin/user/create", files=files)
+    response = client.post("/admin/api/user/create", files=files)
+    assert response.status_code == 200
+    assert response.json()["success"] is True
 
     user = _query_user()
 
@@ -89,13 +91,13 @@ def test_create_form_update(client: TestClient) -> None:
         "file": ("file.txt", b"abc"),
         "optional_file": ("optional_file.txt", b"cdb"),
     }
-    client.post("/admin/user/create", files=files)
+    client.post("/admin/api/user/create", files=files)
 
     files = {
         "file": ("new_file.txt", b"xyz"),
         "optional_file": ("new_optional_file.txt", b"zyx"),
     }
-    client.post("/admin/user/edit/1", files=files)
+    client.post("/admin/api/user/edit/1", files=files)
 
     user = _query_user()
     assert user.file.name == "new_file.txt"
@@ -107,7 +109,7 @@ def test_create_form_update(client: TestClient) -> None:
 
     files = {"file": ("file.txt", b"abc")}
     client.post(
-        "/admin/user/edit/1", files=files, data={"optional_file_checkbox": "true"}
+        "/admin/api/user/edit/1", files=files, data={"optional_file_checkbox": "true"}
     )
 
     user = _query_user()
@@ -122,19 +124,21 @@ def test_get_form_update(client: TestClient) -> None:
         "file": ("file.txt", b"abc"),
         "optional_file": ("optional_file.txt", b"cdb"),
     }
-    client.post("/admin/user/create", files=files)
-    response = client.get("/admin/user/edit/1")
+    client.post("/admin/api/user/create", files=files)
 
-    assert response.text.count("Currently:") == 2
-    assert '<input class="form-check-input" type="checkbox"' in response.text
-    assert (
-        '<label class="form-check-label" for="optional_file_checkbox">Clear</label>'
-        in response.text
-    )
+    response = client.get("/admin/api/user/form-schema?action=edit&pk=1")
+    assert response.status_code == 200
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["file"]["value"] is not None
+    assert fields["optional_file"]["value"] is not None
 
     files = {"file": ("file.txt", b"abc")}
-    client.post("/admin/user/edit/1", files=files)
-    response = client.get("/admin/user/edit/1")
+    client.post("/admin/api/user/edit/1", files=files)
 
-    assert response.text.count("Currently:") == 1
-    assert response.text.count("checkbox") == 0
+    response = client.get("/admin/api/user/form-schema?action=edit&pk=1")
+    assert response.status_code == 200
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["file"]["value"] is not None
+    assert fields["optional_file"]["value"] is None

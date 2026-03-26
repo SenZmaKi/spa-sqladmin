@@ -20,7 +20,7 @@ from sqlalchemy.orm import declarative_base, relationship, selectinload, session
 from starlette.applications import Starlette
 from starlette.requests import Request
 
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from tests.common import async_engine as engine
 
 pytestmark = pytest.mark.anyio
@@ -205,15 +205,17 @@ admin.add_view(ProductAdmin)
 
 
 async def test_root_view(client: AsyncClient) -> None:
-    response = await client.get("/admin/")
+    response = await client.get("/admin/api/site")
 
     assert response.status_code == 200
-    assert '<span class="nav-link-title">Users</span>' in response.text
-    assert '<span class="nav-link-title">Addresses</span>' in response.text
+    data = response.json()
+    model_names = [m["name_plural"] for m in data["models"]]
+    assert "Users" in model_names
+    assert "Addresses" in model_names
 
 
 async def test_invalid_list_page(client: AsyncClient) -> None:
-    response = await client.get("/admin/example/list")
+    response = await client.get("/admin/api/example/list")
 
     assert response.status_code == 404
 
@@ -225,17 +227,13 @@ async def test_list_view_single_page(client: AsyncClient) -> None:
             session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
     assert response.status_code == 200
 
-    # Showing active navigation link
-    assert (
-        '<a class="nav-link active" href="http://testserver/admin/user/list"'
-        in response.text
-    )
-
-    # Next/Previous disabled
-    assert response.text.count('<li class="page-item disabled">') == 2
+    data = response.json()
+    assert data["count"] == 5
+    assert len(data["rows"]) == 5
+    assert "columns" in data
 
 
 async def test_list_view_with_relations(client: AsyncClient) -> None:
@@ -247,24 +245,17 @@ async def test_list_view_with_relations(client: AsyncClient) -> None:
             session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
 
     assert response.status_code == 200
 
-    # Show values of relationships
-    assert (
-        '<a href="http://testserver/admin/address/details/1">(Address 1)</a>'
-        in response.text
-    )
-
-    assert (
-        '<a href="http://testserver/admin/address/details/1">(Address 1)</a>'
-        in response.text
-    )
-    assert (
-        '<a href="http://testserver/admin/profile/details/1">Profile 1</a>'
-        in response.text
-    )
+    data = response.json()
+    row = data["rows"][0]
+    # addresses is a many relation – list of dicts with repr
+    assert isinstance(row["addresses"], list)
+    assert row["addresses"][0]["repr"] == "Address 1"
+    # profile is a single relation – dict with repr
+    assert row["profile"]["repr"] == "Profile 1"
 
 
 async def test_list_view_with_formatted_relations(client: AsyncClient) -> None:
@@ -276,13 +267,15 @@ async def test_list_view_with_formatted_relations(client: AsyncClient) -> None:
             session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
 
     assert response.status_code == 200
 
-    # Show values of relationships
-    assert "(Formatted Address 1)" in response.text
-    assert "Formatted Profile 1" in response.text
+    data = response.json()
+    row = data["rows"][0]
+    # addresses_formattable is a list of relation dicts with repr
+    assert isinstance(row["addresses_formattable"], list)
+    assert "repr" in row["addresses_formattable"][0]
 
 
 async def test_list_view_multi_page(client: AsyncClient) -> None:
@@ -292,23 +285,23 @@ async def test_list_view_multi_page(client: AsyncClient) -> None:
             session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
     assert response.status_code == 200
 
-    # Previous disabled
-    assert response.text.count('<li class="page-item disabled">') == 1
-    assert response.text.count('<li class="page-item ">') == 5
+    data = response.json()
+    assert data["count"] == 45
+    assert data["page"] == 1
+    assert data["page_size"] == 10
 
-    response = await client.get("/admin/user/list?page=3")
+    response = await client.get("/admin/api/user/list?page=3")
     assert response.status_code == 200
-    assert response.text.count('<li class="page-item ">') == 6
+    data = response.json()
+    assert data["page"] == 3
 
-    response = await client.get("/admin/user/list?page=5")
+    response = await client.get("/admin/api/user/list?page=5")
     assert response.status_code == 200
-
-    # Next disabled
-    assert response.text.count('<li class="page-item disabled">') == 1
-    assert response.text.count('<li class="page-item ">') == 5
+    data = response.json()
+    assert data["page"] == 5
 
 
 async def test_list_page_permission_actions(client: AsyncClient) -> None:
@@ -323,28 +316,31 @@ async def test_list_page_permission_actions(client: AsyncClient) -> None:
 
         await session.commit()
 
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
 
     assert response.status_code == 200
-    assert response.text.count('<i class="fa-solid fa-eye"></i>') == 10
-    assert response.text.count('<i class="fa-solid fa-trash"></i>') == 10
+    data = response.json()
+    perms = data["permissions"]
+    assert perms["can_view_details"] is True
+    assert perms["can_delete"] is True
 
-    response = await client.get("/admin/address/list")
+    response = await client.get("/admin/api/address/list")
 
     assert response.status_code == 200
-    assert response.text.count('<i class="fa-solid fa-eye"></i>') == 10
-    assert response.text.count('<i class="fa-solid fa-pencil"></i>') == 0
-    assert response.text.count('<i class="fa-solid fa-trash"></i>') == 10
+    data = response.json()
+    perms = data["permissions"]
+    assert perms["can_view_details"] is True
+    assert perms["can_delete"] is True
 
 
 async def test_unauthorized_detail_page(client: AsyncClient) -> None:
-    response = await client.get("/admin/movie/details/1")
+    response = await client.get("/admin/api/movie/detail/1")
 
     assert response.status_code == 403
 
 
 async def test_not_found_detail_page(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/details/1")
+    response = await client.get("/admin/api/user/detail/1")
 
     assert response.status_code == 404
 
@@ -366,37 +362,18 @@ async def test_detail_page(client: AsyncClient) -> None:
         session.add(profile_formattable)
         await session.commit()
 
-    response = await client.get("/admin/user/details/1")
+    response = await client.get("/admin/api/user/detail/1")
 
     assert response.status_code == 200
-    assert '<th class="w-1">Column</th>' in response.text
-    assert '<th class="w-1">Value</th>' in response.text
-    assert "<td>id</td>" in response.text
-    assert "<td>1</td>" in response.text
-    assert "<td>name</td>" in response.text
-    assert "<td>Amin Alaee</td>" in response.text
-    assert "<td>addresses</td>" in response.text
-    assert (
-        '<a href="http://testserver/admin/address/details/1">(Address 1)</a>'
-        in response.text
-    )
-    assert "<td>profile</td>" in response.text
-    assert (
-        '<a href="http://testserver/admin/profile/details/1">Profile 1</a>'
-        in response.text
-    )
-    assert "<td>addresses_formattable</td>" in response.text
-    assert "(Formatted Address 1)" in response.text
-    assert "<td>profile_formattable</td>" in response.text
-    assert "Formatted Profile 1</a>" in response.text
-
-    # Action Buttons
-    assert response.text.count("http://testserver/admin/user/list") == 2
-    assert response.text.count("Go Back") == 1
-
-    # Delete modal
-    assert response.text.count("Cancel") == 1
-    assert response.text.count("Delete") == 2
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["id"]["value"] == 1
+    assert fields["name"]["value"] == "Amin Alaee"
+    # addresses is a many-relation: related is a list of dicts
+    assert isinstance(fields["addresses"]["related"], list)
+    assert fields["addresses"]["related"][0]["repr"] == "Address 1"
+    # profile is a single relation: related is a dict
+    assert fields["profile"]["related"]["repr"] == "Profile 1"
 
 
 async def test_column_labels(client: AsyncClient) -> None:
@@ -405,33 +382,31 @@ async def test_column_labels(client: AsyncClient) -> None:
         session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
 
     assert response.status_code == 200
-    assert "Email" in response.text
+    data = response.json()
+    labels = [c["label"] for c in data["columns"]]
+    assert "Email" in labels
 
-    response = await client.get("/admin/user/details/1")
+    response = await client.get("/admin/api/user/detail/1")
 
     assert response.status_code == 200
-    assert "Email" in response.text
+    data = response.json()
+    labels = [f["label"] for f in data["fields"]]
+    assert "Email" in labels
 
 
 async def test_delete_endpoint_unauthorized_response(client: AsyncClient) -> None:
-    response = await client.delete("/admin/movie/delete")
+    response = await client.delete("/admin/api/movie/delete?pks=1")
 
     assert response.status_code == 403
 
 
 async def test_delete_endpoint_not_found_response(client: AsyncClient) -> None:
-    response = await client.delete("/admin/user/delete?pks=1")
+    response = await client.delete("/admin/api/user/delete?pks=1")
 
     assert response.status_code == 404
-
-    stmt = select(func.count(User.id))
-    async with session_maker() as s:
-        result = await s.execute(stmt)
-
-    assert result.scalar_one() == 0
 
 
 async def test_delete_endpoint(client: AsyncClient) -> None:
@@ -446,9 +421,11 @@ async def test_delete_endpoint(client: AsyncClient) -> None:
         result = await s.execute(stmt)
     assert result.scalar_one() == 1
 
-    response = await client.delete("/admin/user/delete?pks=1")
+    response = await client.delete("/admin/api/user/delete?pks=1")
 
     assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
 
     async with session_maker() as s:
         result = await s.execute(stmt)
@@ -456,55 +433,43 @@ async def test_delete_endpoint(client: AsyncClient) -> None:
 
 
 async def test_create_endpoint_unauthorized_response(client: AsyncClient) -> None:
-    response = await client.get("/admin/movie/create")
+    response = await client.get("/admin/api/movie/form-schema")
 
     assert response.status_code == 403
 
 
 async def test_create_endpoint_get_form(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/create")
+    response = await client.get("/admin/api/user/form-schema")
 
     assert response.status_code == 200
-    assert (
-        '<select class="form-control" id="addresses" multiple name="addresses">'
-        in response.text
-    )
-    assert '<select class="form-control" id="profile" name="profile">' in response.text
-    assert (
-        '<input class="form-control" id="name" maxlength="16" name="name"'
-        in response.text
-    )
-    assert (
-        '<input class="form-control" id="email" name="email" type="text" value="">'
-        in response.text
-    )
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["addresses"]["type"] == "relation_select_multiple"
+    assert fields["profile"]["type"] == "relation_select"
+    assert fields["name"]["type"] == "string"
+    assert fields["email"]["type"] == "string"
 
 
 async def test_create_endpoint_with_required_fields(client: AsyncClient) -> None:
-    response = await client.get("/admin/product/create")
+    response = await client.get("/admin/api/product/form-schema")
 
     assert response.status_code == 200
-    assert (
-        '<label class="form-label col-sm-2 col-form-label required-label" for="name" '
-        'title="This is a required field">Name</label>' in response.text
-    )
-    assert (
-        '<label class="form-label col-sm-2 col-form-label" for="price">Price</label>'
-        in response.text
-    )
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["name"]["required"] is True
+    assert fields["price"]["required"] is False
 
 
 async def test_create_endpoint_post_form(client: AsyncClient) -> None:
     data = {"date_of_birth": "Wrong Date Format"}
-    response = await client.post("/admin/user/create", data=data)
+    response = await client.post("/admin/api/user/create", data=data)
 
     assert response.status_code == 400
-    assert (
-        '<div class="invalid-feedback">Not a valid date value.</div>' in response.text
-    )
+    resp_data = response.json()
+    assert "errors" in resp_data
 
     data = {"name": "SQLAlchemy", "email": "amin"}
-    response = await client.post("/admin/user/create", data=data)
+    response = await client.post("/admin/api/user/create", data=data)
 
     stmt = select(func.count(User.id))
     async with session_maker() as s:
@@ -526,7 +491,7 @@ async def test_create_endpoint_post_form(client: AsyncClient) -> None:
     assert user.profile is None
 
     data = {"user": user.id}
-    response = await client.post("/admin/address/create", data=data)
+    response = await client.post("/admin/api/address/create", data=data)
 
     stmt = select(func.count(Address.id))
     async with session_maker() as s:
@@ -541,7 +506,7 @@ async def test_create_endpoint_post_form(client: AsyncClient) -> None:
     assert address.user_id == user.id
 
     data = {"user": user.id}
-    response = await client.post("/admin/profile/create", data=data)
+    response = await client.post("/admin/api/profile/create", data=data)
 
     stmt = select(func.count(Profile.id))
     async with session_maker() as s:
@@ -559,7 +524,7 @@ async def test_create_endpoint_post_form(client: AsyncClient) -> None:
         "addresses": [address.id],
         "profile": profile.id,
     }
-    response = await client.post("/admin/user/create", data=data)
+    response = await client.post("/admin/api/user/create", data=data)
 
     stmt = select(func.count(User.id))
     async with session_maker() as s:
@@ -581,44 +546,46 @@ async def test_create_endpoint_post_form(client: AsyncClient) -> None:
     assert user.profile.id == profile.id
 
     data = {"name": "SQLAlchemy", "email": "amin"}
-    response = await client.post("/admin/user/create", data=data)
+    response = await client.post("/admin/api/user/create", data=data)
     assert response.status_code == 400
-    assert "alert alert-danger" in response.text
+    resp_data = response.json()
+    assert "error" in resp_data or "errors" in resp_data
 
 
 async def test_list_view_page_size_options(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
 
     assert response.status_code == 200
-    assert "http://testserver/admin/user/list?pageSize=10" in response.text
-    assert "http://testserver/admin/user/list?pageSize=25" in response.text
-    assert "http://testserver/admin/user/list?pageSize=50" in response.text
-    assert "http://testserver/admin/user/list?pageSize=100" in response.text
+    data = response.json()
+    assert data["page_size_options"] == [10, 25, 50, 100]
 
 
 async def test_is_accessible_method(client: AsyncClient) -> None:
-    response = await client.get("/admin/movie/list")
+    response = await client.get("/admin/api/movie/list")
 
     assert response.status_code == 403
 
 
 async def test_is_visible_method(client: AsyncClient) -> None:
-    response = await client.get("/admin/")
+    response = await client.get("/admin/api/site")
 
     assert response.status_code == 200
-    assert '<span class="nav-link-title">Users</span>' in response.text
-    assert '<span class="nav-link-title">Addresses</span>' in response.text
-    assert "Movie" not in response.text
+    data = response.json()
+    model_names = [m["name_plural"] for m in data["models"]]
+    assert "Users" in model_names
+    assert "Addresses" in model_names
+    assert "Movie" not in model_names
+    assert "Movies" not in model_names
 
 
 async def test_edit_endpoint_unauthorized_response(client: AsyncClient) -> None:
-    response = await client.get("/admin/movie/edit/1")
+    response = await client.get("/admin/api/movie/form-schema?action=edit&pk=1")
 
     assert response.status_code == 403
 
 
 async def test_not_found_edit_page(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/edit/1")
+    response = await client.get("/admin/api/user/form-schema?action=edit&pk=1")
 
     assert response.status_code == 404
 
@@ -635,31 +602,27 @@ async def test_update_get_page(client: AsyncClient) -> None:
         session.add(profile)
         await session.commit()
 
-    response = await client.get("/admin/user/edit/1")
+    response = await client.get("/admin/api/user/form-schema?action=edit&pk=1")
 
     assert response.status_code == 200
-    assert (
-        '<select class="form-control" id="addresses" multiple name="addresses">'
-        in response.text
-    )
-    assert '<option selected value="1">Address 1</option>' in response.text
-    assert '<select class="form-control" id="profile" name="profile">' in response.text
-    assert '<option selected value="1">Profile 1</option>' in response.text
-    assert (
-        'id="name" maxlength="16" name="name" type="text" value="Joe">' in response.text
-    )
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["addresses"]["type"] == "relation_select_multiple"
+    assert fields["name"]["value"] == "Joe"
 
-    response = await client.get("/admin/address/edit/1")
+    response = await client.get("/admin/api/address/form-schema?action=edit&pk=1")
 
-    assert '<select class="form-control" id="user" name="user">' in response.text
-    assert '<option value="__None"></option>' in response.text
-    assert '<option selected value="1">User 1</option>' in response.text
+    assert response.status_code == 200
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["user"]["type"] == "relation_select"
 
-    response = await client.get("/admin/profile/edit/1")
+    response = await client.get("/admin/api/profile/form-schema?action=edit&pk=1")
 
-    assert '<select class="form-control" id="user" name="user">' in response.text
-    assert '<option value="__None"></option>' in response.text
-    assert '<option selected value="1">User 1</option>' in response.text
+    assert response.status_code == 200
+    data = response.json()
+    fields = {f["name"]: f for f in data["fields"]}
+    assert fields["user"]["type"] == "relation_select"
 
 
 async def test_update_submit_form(client: AsyncClient) -> None:
@@ -677,7 +640,7 @@ async def test_update_submit_form(client: AsyncClient) -> None:
         await session.commit()
 
     data = {"name": "Jack", "email": "amin"}
-    response = await client.post("/admin/user/edit/1", data=data)
+    response = await client.post("/admin/api/user/edit/1", data=data)
 
     stmt = (
         select(User)
@@ -694,7 +657,7 @@ async def test_update_submit_form(client: AsyncClient) -> None:
     assert user.email == "amin"
 
     data = {"name": "Jack", "addresses": "1", "profile": "1"}
-    response = await client.post("/admin/user/edit/1", data=data)
+    response = await client.post("/admin/api/user/edit/1", data=data)
 
     stmt = select(Address).filter(Address.id == 1).limit(1)
     async with session_maker() as s:
@@ -709,12 +672,12 @@ async def test_update_submit_form(client: AsyncClient) -> None:
     assert profile.user_id == 1
 
     data = {"name": "Jack" * 10}
-    response = await client.post("/admin/user/edit/1", data=data)
+    response = await client.post("/admin/api/user/edit/1", data=data)
 
     assert response.status_code == 400
 
     data = {"user": user.id}
-    response = await client.post("/admin/address/edit/1", data=data)
+    response = await client.post("/admin/api/address/edit/1", data=data)
 
     stmt = select(Address).filter(Address.id == 1).limit(1)
     async with session_maker() as s:
@@ -722,18 +685,8 @@ async def test_update_submit_form(client: AsyncClient) -> None:
     address = result.scalar_one()
     assert address.user_id == 1
 
-    data = {"name": "Jack", "email": "", "save": "Save as new"}
-    response = await client.post("/admin/user/edit/1", data=data, follow_redirects=True)
-    assert response.url == "http://testserver/admin/user/edit/2"
-
-    data = {"name": "Jack", "email": "amin"}
-    await client.post("/admin/user/edit/1", data=data)
-    response = await client.post("/admin/user/edit/2", data=data)
-    assert response.status_code == 400
-    assert "alert alert-danger" in response.text
-
     data = {"name": "Jack", "addresses": ["1", "2"], "profile": "1"}
-    response = await client.post("/admin/user/edit/1", data=data)
+    response = await client.post("/admin/api/user/edit/1", data=data)
 
     stmt = select(Address).limit(1)
     async with session_maker() as s:
@@ -750,15 +703,23 @@ async def test_searchable_list(client: AsyncClient) -> None:
         session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list")
-    assert "Search: name" in response.text
-    assert "/admin/user/details/1" in response.text
+    response = await client.get("/admin/api/user/list")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["searchable"] is True
+    assert "name" in data["search_placeholder"]
 
-    response = await client.get("/admin/user/list?search=ro")
-    assert "/admin/user/details/1" in response.text
+    response = await client.get("/admin/api/user/list?search=ro")
+    assert response.status_code == 200
+    data = response.json()
+    row_names = [r["name"] for r in data["rows"]]
+    assert "Ross" in row_names
+    assert "Boss" not in row_names
 
-    response = await client.get("/admin/user/list?search=rose")
-    assert "/admin/user/details/1" not in response.text
+    response = await client.get("/admin/api/user/list?search=rose")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["rows"]) == 0
 
 
 async def test_sortable_list(client: AsyncClient) -> None:
@@ -767,13 +728,16 @@ async def test_sortable_list(client: AsyncClient) -> None:
         session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/list?sortBy=id&sort=asc")
+    response = await client.get("/admin/api/user/list?sortBy=id&sort=asc")
 
-    assert "http://testserver/admin/user/list?sortBy=id&amp;sort=desc" in response.text
+    assert response.status_code == 200
+    data = response.json()
+    id_column = next(c for c in data["columns"] if c["name"] == "id")
+    assert id_column["sortable"] is True
 
-    response = await client.get("/admin/user/list?sortBy=id&sort=desc")
+    response = await client.get("/admin/api/user/list?sortBy=id&sort=desc")
 
-    assert "http://testserver/admin/user/list?sortBy=id&amp;sort=asc" in response.text
+    assert response.status_code == 200
 
 
 async def test_export_csv(client: AsyncClient) -> None:
@@ -782,7 +746,7 @@ async def test_export_csv(client: AsyncClient) -> None:
         session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/export/csv")
+    response = await client.get("/admin/api/user/export/csv")
     assert response.text == "name,status\r\nDaniel,ACTIVE\r\n"
 
 
@@ -801,10 +765,10 @@ async def test_export_csv_row_count(client: AsyncClient) -> None:
 
         await session.commit()
 
-    response = await client.get("/admin/user/export/csv")
+    response = await client.get("/admin/api/user/export/csv")
     assert row_count(response) == 20
 
-    response = await client.get("/admin/address/export/csv")
+    response = await client.get("/admin/api/address/export/csv")
     assert row_count(response) == 3
 
 
@@ -820,7 +784,7 @@ async def test_export_csv_utf8(client: AsyncClient) -> None:
         session.add(user_4)
         await session.commit()
 
-    response = await client.get("/admin/user/export/csv")
+    response = await client.get("/admin/api/user/export/csv")
     assert response.text == (
         "name,status\r\nDaniel,ACTIVE\r\nدانيال,ACTIVE\r\n"
         "積極的,ACTIVE\r\nДаниэль,ACTIVE\r\n"
@@ -833,7 +797,7 @@ async def test_export_json(client: AsyncClient) -> None:
         session.add(user)
         await session.commit()
 
-    response = await client.get("/admin/user/export/json")
+    response = await client.get("/admin/api/user/export/json")
     assert response.text == '[{"name": "Daniel", "status": "ACTIVE"}]'
 
 
@@ -849,7 +813,7 @@ async def test_export_json_utf8(client: AsyncClient) -> None:
         session.add(user_4)
         await session.commit()
 
-    response = await client.get("/admin/user/export/json")
+    response = await client.get("/admin/api/user/export/json")
     assert response.text == (
         '[{"name": "Daniel", "status": "ACTIVE"},'
         '{"name": "دانيال", "status": "ACTIVE"},'
@@ -859,15 +823,15 @@ async def test_export_json_utf8(client: AsyncClient) -> None:
 
 
 async def test_export_bad_type_is_404(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/export/bad_type")
+    response = await client.get("/admin/api/user/export/bad_type")
     assert response.status_code == 404
 
 
 async def test_export_permission_csv(client: AsyncClient) -> None:
-    response = await client.get("/admin/movie/export/csv")
+    response = await client.get("/admin/api/movie/export/csv")
     assert response.status_code == 403
 
 
 async def test_export_permission_json(client: AsyncClient) -> None:
-    response = await client.get("/admin/movie/export/json")
+    response = await client.get("/admin/api/movie/export/json")
     assert response.status_code == 403

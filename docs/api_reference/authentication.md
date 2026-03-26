@@ -1,4 +1,4 @@
-::: sqladmin.authentication.AuthenticationBackend
+::: spa_sqladmin.authentication.AuthenticationBackend
     handler: python
     options:
       members:

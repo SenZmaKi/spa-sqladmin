@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Time
 from sqlalchemy.orm import declarative_base
 
-from sqladmin.helpers import (
+from spa_sqladmin.helpers import (
     get_object_identifier,
     is_falsy_value,
     object_identifier_values,

@@ -6,7 +6,7 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
 from wtforms import Form
 
-from sqladmin.fields import (
+from spa_sqladmin.fields import (
     DateField,
     DateTimeField,
     IntervalField,
@@ -43,7 +43,6 @@ def test_date_field() -> None:
     form = F()
 
     assert form.date.format == ["%Y-%m-%d"]
-    assert 'data-role="datepicker"' in form.date()
 
     form = F(DummyData(date=["2021-12-22"]))
     assert form.date.data == date(2021, 12, 22)
@@ -56,7 +55,6 @@ def test_datetime_field() -> None:
     form = F()
 
     assert form.datetime.format == ["%Y-%m-%d %H:%M:%S"]
-    assert 'data-role="datetimepicker"' in form.datetime()
 
     form = F(DummyData(datetime=["2021-12-22 12:30:00"]))
     assert form.datetime.data == datetime(2021, 12, 22, 12, 30, 0, 0)
@@ -162,7 +160,6 @@ def test_select2_tags_field() -> None:
         array = Select2TagsField()
 
     form = F()
-    assert 'data-role="select2-tags"' in form.array()
     assert form.array.pre_validate(form) is None
 
     form = F(DummyData(array=["a", "b", "abc"]))

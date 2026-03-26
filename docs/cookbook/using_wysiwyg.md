@@ -1,5 +1,6 @@
-You can customize the templates and add custom javascript code to enable CKEditor to your fields.
-In order to use `CKEditor` you need to inject some JS code into the SQLAdmin and that works by customizing the templates.
+SQLAdmin now uses a React-based SPA for the admin interface. Rich text editing for textarea fields can be configured through the frontend components.
+
+For textarea fields in your models, SQLAdmin will automatically render a `<Textarea>` component. If you need a WYSIWYG editor, you can customize the frontend by modifying the `FormField` component in `frontend/src/pages/create.tsx` to integrate a React-based rich text editor like [TipTap](https://tiptap.dev/) or [Lexical](https://lexical.dev/).
 
 Let's say you have the following model:
 
@@ -9,28 +10,6 @@ class Post(Base):
     content = Column(Text, nullable=False)
 ```
 
-- First create a `templates/sqladmin` directory in your project.
-- Then add a file `custom_edit.html` there with the following content:
-```html title="custom_edit.html"
-{% extends "sqladmin/edit.html" %}
-{% block tail %}
-<script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
-<script>
-    ClassicEditor
-        .create(document.querySelector('#content'))
-        .catch(error => {
-            console.error(error);
-        });
-</script>
-{% endblock %}
-```
+The `content` field will be rendered as a `textarea` in the admin create/edit forms. SQLAdmin's form schema API will report it as type `"textarea"`, which the React frontend renders accordingly.
 
-- Use the `custom_edit.html` template in your admin:
-
-```py
-class PostAdmin(ModelView, model=Post):
-    edit_template = "custom_edit.html"
-```
-
-Now whenever editing a Post object in admin, the CKEditor will be applied to the `content` field of the model.
-You can do the same thing with `create_template` field.
+For custom rich text integration, modify the `FieldInput` component in the frontend source to add a WYSIWYG editor for `textarea` type fields.

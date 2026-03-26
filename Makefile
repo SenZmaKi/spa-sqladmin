@@ -20,7 +20,7 @@ actions = \
 	publish
 
 # ARGS used for `test`. `PY_ARGS` used for `lint` and `format`
-PY_ARGS := $(or $(filter %.py,$(ARGS)),sqladmin)
+PY_ARGS := $(or $(filter %.py,$(ARGS)),spa_sqladmin)
 
 setup:
 	uv sync --all-groups
@@ -42,7 +42,7 @@ format:
 	uv run ruff check --fix $(PY_ARGS)
 
 secure:
-	uv run bandit -r sqladmin --config pyproject.toml
+	uv run bandit -r spa_sqladmin --config pyproject.toml
 
 docs-build:
 	uv run mkdocs build
@@ -53,11 +53,20 @@ docs-serve:
 docs-deploy:
 	uv run mkdocs gh-deploy --force
 
-build:
+frontend-install:
+	cd frontend && npm install
+
+frontend-build:
+	cd frontend && npm run build
+
+frontend-dev:
+	cd frontend && npm run dev
+
+build: frontend-build
 	uv build
 
 publish:
 	uv publish
 
 
-.PHONY: setup test cov lint-check lint-format docs-build docs-serve docs-deploy build publish
+.PHONY: setup test cov lint-check lint-format docs-build docs-serve docs-deploy build publish frontend-install frontend-build frontend-dev

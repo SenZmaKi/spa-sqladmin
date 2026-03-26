@@ -1,4 +1,4 @@
-::: sqladmin.models.BaseView
+::: spa_sqladmin.models.BaseView
     handler: python
     options:
       members:

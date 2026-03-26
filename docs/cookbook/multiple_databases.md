@@ -19,7 +19,7 @@ and `Account` will be in engine2.
 And when instantiating the `Admin` object you can use the `sessionmaker` factory you have:
 
 ```py
-from sqladmin import Admin
+from spa_sqladmin import Admin
 
 
 admin = Admin(app=app, session_maker=Session)

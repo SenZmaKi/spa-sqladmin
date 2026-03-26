@@ -55,7 +55,7 @@ You can inherit from `ModelConverter` to create your own converter and customize
 from typing import Any
 import json
 from wtforms import JSONField
-from sqladmin import ModelConverter
+from spa_sqladmin import ModelConverter
 
 
 class CustomJSONField(JSONField):
@@ -85,7 +85,7 @@ In this example:
 To use your custom model converter in the admin interface, specify it in your `ModelView` class:
 
 ```python
-from sqladmin import ModelView
+from spa_sqladmin import ModelView
 
 
 class BaseAdmin(ModelView):
@@ -125,7 +125,7 @@ Base.metadata.create_all(engine)  # Create tables
 ### Step 2: Create Custom Model Converter
 
 ```python
-from sqladmin import ModelConverter
+from spa_sqladmin import ModelConverter
 from wtforms import JSONField
 import json
 
@@ -149,7 +149,7 @@ class CustomModelConverter(ModelConverter):
 ### Step 3: Use Custom Converter in Admin Interface
 
 ```python
-from sqladmin import ModelView
+from spa_sqladmin import ModelView
 
 
 class UserAdmin(BaseAdmin):

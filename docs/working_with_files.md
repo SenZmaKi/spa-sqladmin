@@ -17,7 +17,7 @@ Let's see a minimal example:
 
 ```python
 from fastapi import FastAPI
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from sqlalchemy import Column, Integer, create_engine
 from sqlalchemy.orm import declarative_base
 from fastapi_storages import FileSystemStorage

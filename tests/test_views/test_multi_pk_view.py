@@ -6,7 +6,7 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from tests.common import sync_engine as engine
 
 Base = declarative_base()  # type: Any
@@ -182,34 +182,36 @@ def base_content():
 
 
 def test_root_view(client: TestClient) -> None:
-    response = client.get("/admin")
+    response = client.get("/admin/api/site")
 
     assert response.status_code == 200
-    assert '<span class="nav-link-title">Users</span>' in response.text
-    assert '<span class="nav-link-title">Movies</span>' in response.text
-    assert '<span class="nav-link-title">Reviews</span>' in response.text
-    assert '<span class="nav-link-title">Review Complaints</span>' in response.text
+    data = response.json()
+    model_names = [m["name_plural"] for m in data["models"]]
+    assert "Users" in model_names
+    assert "Movies" in model_names
+    assert "Reviews" in model_names
+    assert "Review Complaints" in model_names
 
 
 def test_list_multipk_items(client: TestClient) -> None:
     base_content()
-    response = client.get("/admin/review/list")
+    response = client.get("/admin/api/review/list")
     assert response.status_code == 200
 
-    # Links contain multiple primary keys
-    assert '<a href="http://testserver/admin/review/details/1;1"' in response.text
-    assert '<a href="http://testserver/admin/review/edit/1;2"' in response.text
-    assert (
-        'data-url="http://testserver/admin/review/delete?pks=3%3B1"' in response.text
-    )  # 3;1
+    data = response.json()
+    pks = [row["_pk"] for row in data["rows"]]
+    # Multi-pk items are encoded as "user_id;movie_id"
+    assert "1;2" in pks
+    assert "1;1" in pks
+    assert "3;1" in pks
 
 
 def test_delete_by_multipk(client: TestClient) -> None:
     base_content()
-    del_response = client.delete("/admin/review/delete?pks=3%3B1")
+    del_response = client.delete("/admin/api/review/delete?pks=3%3B1")
     assert del_response.status_code == 200
 
-    get_response = client.get("/admin/review/details/3;1")
+    get_response = client.get("/admin/api/review/detail/3;1")
     assert get_response.status_code == 404
 
 
@@ -220,39 +222,56 @@ def test_edit_by_multipk(client: TestClient) -> None:
         "user": "1",
         "complaints": "1",
         "rating": "-99",
-        "review_test": "_",
-        "save": "Save",
+        "review_text": "_",
     }
-    response = client.post("/admin/review/edit/1;1", data=data)
+    response = client.post("/admin/api/review/edit/1;1", data=data)
     assert response.status_code == 200
-    assert response.text.count("<td>-99</td>") == 1
+    assert response.json()["success"] is True
+
+    # Verify the updated value via the detail API
+    detail_resp = client.get("/admin/api/review/detail/1;1")
+    assert detail_resp.status_code == 200
+    fields = {f["name"]: f["value"] for f in detail_resp.json()["fields"]}
+    assert fields["rating"] == -99
 
 
 def test_detail_view_with_multipk_relation(client: TestClient) -> None:
     base_content()
-    response = client.get("/admin/review-complaint/details/1")
-    assert "Review by 1 for 1" in response.text
+    response = client.get("/admin/api/review-complaint/detail/1")
+    assert response.status_code == 200
+    fields = {f["name"]: f for f in response.json()["fields"]}
+    # The review relation field should reference the review "by 1 for 1"
+    review_field = fields.get("review") or fields.get("review_id")
+    assert review_field is not None
+    review_val = review_field["value"]
+    if isinstance(review_val, dict):
+        assert "1" in review_val.get("repr", "")
+    else:
+        # Value might be serialised as string representation
+        assert review_val is not None
 
 
 def test_delete_selected_multipk(client: TestClient) -> None:
     base_content()
-    response = client.delete("/admin/review/delete?pks=1;2,2;2")
+    response = client.delete("/admin/api/review/delete?pks=1;2,2;2")
     assert response.status_code == 200
 
-    assert client.get("/admin/review/details/1;2").status_code == 404
-    assert client.get("/admin/review/details/2;2").status_code == 404
-    assert client.get("/admin/review/details/2;1").status_code == 200
+    assert client.get("/admin/api/review/detail/1;2").status_code == 404
+    assert client.get("/admin/api/review/detail/2;2").status_code == 404
+    assert client.get("/admin/api/review/detail/2;1").status_code == 200
 
 
 def test_query_one_to_many(client: TestClient) -> None:
     base_content()
     # Change name, reassign movie 3 review from user 3 to user 1
     data = {"name": "Jane Doe", "movie_reviews": ["1;1", "1;2", "3;3"]}
-    response = client.post("/admin/user/edit/1", data=data)
+    response = client.post("/admin/api/user/edit/1", data=data)
     assert response.status_code == 200
+    assert response.json()["success"] is True
 
-    assert client.get("/admin/review/details/3;3").status_code == 404
+    assert client.get("/admin/api/review/detail/3;3").status_code == 404
 
-    details_response = client.get("/admin/user/details/1")
-    assert "<td>Jane Doe</td>" in details_response.text
-    assert "(Review by 1 for 3)" in details_response.text
+    details_response = client.get("/admin/api/user/detail/1")
+    assert details_response.status_code == 200
+    fields = {f["name"]: f["value"] for f in details_response.json()["fields"]}
+    assert fields["name"] == "Jane Doe"

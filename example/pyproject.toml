@@ -1,0 +1,16 @@
+[project]
+name = "example"
+version = "0.1.0"
+description = "Example FastAPI application demonstrating spa-sqladmin features"
+requires-python = ">=3.9"
+dependencies = [
+    "spa-sqladmin",
+    "fastapi",
+    "uvicorn[standard]",
+    "aiosqlite",
+    "sqlalchemy",
+    "itsdangerous>=2.2.0",
+]
+
+[tool.uv.sources]
+spa-sqladmin = { path = "..", editable = true }

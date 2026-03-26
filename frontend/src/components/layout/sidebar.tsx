@@ -1,0 +1,485 @@
+import React from 'react'
+import { Link, useRouterState } from '@tanstack/react-router'
+import { cn } from '@/lib/utils'
+import { getBaseUrl, logout } from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { useUIStore } from '@/stores/ui-store'
+import type { MenuItem, SiteData } from '@/lib/types'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyLinkTo = any
+import {
+  // Original imports
+  Users,
+  Package,
+  LayoutDashboard,
+  Settings,
+  FileText,
+  ShoppingCart,
+  Tag,
+  Mail,
+  Globe,
+  Image,
+  MessageSquare,
+  Calendar,
+  Database,
+  Shield,
+  Star,
+  Heart,
+  BookOpen,
+  Folder,
+  Home,
+  Bell,
+  Map,
+  CreditCard,
+  Truck,
+  ChevronDown,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeft,
+  LogOut,
+  // Expanded icon set
+  Activity,
+  AlertCircle,
+  AlertTriangle,
+  Archive,
+  Award,
+  BarChart,
+  BarChart2,
+  BarChart3,
+  Bookmark,
+  Box,
+  Briefcase,
+  Building,
+  Building2,
+  Camera,
+  Check,
+  CheckCircle,
+  Circle,
+  Clipboard,
+  Clock,
+  Cloud,
+  Code,
+  Cog,
+  Compass,
+  Copy,
+  DollarSign,
+  Download,
+  Edit,
+  Eye,
+  EyeOff,
+  File,
+  Film,
+  Filter,
+  Flag,
+  Gift,
+  Hash,
+  Headphones,
+  HelpCircle,
+  Inbox,
+  Info,
+  Key,
+  Layers,
+  Layout,
+  Link as LinkIcon,
+  List,
+  Lock,
+  LogIn,
+  MapPin,
+  Megaphone,
+  Menu,
+  Mic,
+  Monitor,
+  Moon,
+  MoreHorizontal,
+  Music,
+  Navigation,
+  Paperclip,
+  Pen,
+  Phone,
+  PieChart,
+  Pin,
+  Play,
+  Plus,
+  Printer,
+  Radio,
+  RefreshCw,
+  Repeat,
+  Rocket,
+  RotateCw,
+  Rss,
+  Save,
+  Scissors,
+  Search,
+  Send,
+  Server,
+  Share,
+  ShieldCheck,
+  Smartphone,
+  Speaker,
+  Sun,
+  Table,
+  Target,
+  Terminal,
+  ThumbsUp,
+  ThumbsDown,
+  Hammer,
+  Trash,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Upload,
+  User,
+  UserCheck,
+  UserPlus,
+  UserX,
+  Video,
+  Wallet,
+  Wifi,
+  Wrench,
+  X,
+  Zap,
+  ZoomIn,
+  ZoomOut,
+  GitBranch,
+  GitCommit,
+  GitMerge,
+  GitPullRequest,
+  Github,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Plug,
+  Power,
+  QrCode,
+  Scan,
+  Usb,
+  Car,
+  Bike,
+  Bus,
+  Plane,
+  Ship,
+  Train,
+  type LucideIcon,
+} from 'lucide-react'
+
+const FA_TO_LUCIDE: Record<string, LucideIcon> = {
+  'fa-solid fa-user': Users,
+  'fa-solid fa-users': Users,
+  'fa-solid fa-box': Package,
+  'fa-solid fa-boxes': Package,
+  'fa-solid fa-cog': Settings,
+  'fa-solid fa-gear': Settings,
+  'fa-solid fa-cogs': Settings,
+  'fa-solid fa-file': FileText,
+  'fa-solid fa-file-alt': FileText,
+  'fa-solid fa-file-text': FileText,
+  'fa-solid fa-shopping-cart': ShoppingCart,
+  'fa-solid fa-cart-shopping': ShoppingCart,
+  'fa-solid fa-tag': Tag,
+  'fa-solid fa-tags': Tag,
+  'fa-solid fa-envelope': Mail,
+  'fa-solid fa-globe': Globe,
+  'fa-solid fa-image': Image,
+  'fa-solid fa-images': Image,
+  'fa-solid fa-comment': MessageSquare,
+  'fa-solid fa-comments': MessageSquare,
+  'fa-solid fa-calendar': Calendar,
+  'fa-solid fa-database': Database,
+  'fa-solid fa-shield': Shield,
+  'fa-solid fa-shield-alt': Shield,
+  'fa-solid fa-star': Star,
+  'fa-solid fa-heart': Heart,
+  'fa-solid fa-book': BookOpen,
+  'fa-solid fa-folder': Folder,
+  'fa-solid fa-home': Home,
+  'fa-solid fa-house': Home,
+  'fa-solid fa-bell': Bell,
+  'fa-solid fa-map': Map,
+  'fa-solid fa-credit-card': CreditCard,
+  'fa-solid fa-truck': Truck,
+  'fa-solid fa-dashboard': LayoutDashboard,
+  'fa-solid fa-table-columns': LayoutDashboard,
+  'fa-solid fa-receipt': FileText,
+  'fa-solid fa-list': LayoutDashboard,
+  'fa-solid fa-user-group': Users,
+  'fa-solid fa-people-group': Users,
+}
+
+const LUCIDE_BY_NAME: Record<string, LucideIcon> = {
+  // Original set
+  Users, Package, Settings, FileText, ShoppingCart, Tag, Mail, Globe, Image,
+  MessageSquare, Calendar, Database, Shield, Star, Heart, BookOpen, Folder,
+  Home, Bell, Map, CreditCard, Truck, LayoutDashboard,
+  // Expanded set
+  Activity, AlertCircle, AlertTriangle, Archive, Award,
+  BarChart, BarChart2, BarChart3,
+  Bookmark, Box, Briefcase, Building, Building2, Camera, Check, CheckCircle,
+  Circle, Clipboard, Clock, Cloud, Code, Cog, Compass, Copy,
+  DollarSign, Download, Edit, Eye, EyeOff, File, Film, Filter,
+  Flag, Gift, Hash, Headphones, HelpCircle, Inbox, Info, Key,
+  Layers, Layout, Link: LinkIcon, List, Lock, LogIn, LogOut, MapPin,
+  Megaphone, Menu, Mic, Monitor, Moon, MoreHorizontal, Music, Navigation,
+  Paperclip, Pen, Phone, PieChart, Pin, Play, Plus, Printer,
+  Radio, RefreshCw, Repeat, Rocket, RotateCw, Rss, Save, Scissors,
+  Search, Send, Server, Share, ShieldCheck, Smartphone, Speaker, Sun,
+  Table, Target, Terminal, ThumbsUp, ThumbsDown, Hammer, Trash, Trash2,
+  TrendingUp, TrendingDown, Upload, User, UserCheck, UserPlus, UserX, Video,
+  Wallet, Wifi, Wrench, X, Zap, ZoomIn, ZoomOut,
+  GitBranch, GitCommit, GitMerge, GitPullRequest, Github,
+  Cpu, HardDrive, MemoryStick, Plug, Power, QrCode, Scan, Usb,
+  Car, Bike, Bus, Plane, Ship, Train,
+}
+
+// --- SVG string support ---
+
+function isSvgString(icon: string): boolean {
+  return icon.trim().startsWith('<svg')
+}
+
+export function SvgIcon({ svg, className }: { svg: string; className?: string }) {
+  const processedSvg = svg.replace(/<svg/, `<svg class="${className || 'h-4 w-4'}"`)
+  return <span dangerouslySetInnerHTML={{ __html: processedSvg }} />
+}
+
+export type ResolvedIcon =
+  | { type: 'lucide'; icon: LucideIcon }
+  | { type: 'svg'; svg: string }
+
+export function resolveIcon(icon: string): ResolvedIcon {
+  if (!icon) return { type: 'lucide', icon: LayoutDashboard }
+  if (isSvgString(icon)) return { type: 'svg', svg: icon }
+  if (FA_TO_LUCIDE[icon]) return { type: 'lucide', icon: FA_TO_LUCIDE[icon] }
+  if (LUCIDE_BY_NAME[icon]) return { type: 'lucide', icon: LUCIDE_BY_NAME[icon] }
+  const lower = icon.toLowerCase()
+  for (const [name, comp] of Object.entries(LUCIDE_BY_NAME)) {
+    if (name.toLowerCase() === lower) return { type: 'lucide', icon: comp }
+  }
+  return { type: 'lucide', icon: LayoutDashboard }
+}
+
+/** @deprecated Use `resolveIcon` instead */
+export function mapFaToLucide(icon: string): LucideIcon {
+  const resolved = resolveIcon(icon)
+  return resolved.type === 'lucide' ? resolved.icon : LayoutDashboard
+}
+
+interface SidebarProps {
+  site: SiteData
+  collapsed: boolean
+  onCollapsedChange: (collapsed: boolean) => void
+  mobileOpen: boolean
+  onMobileClose: () => void
+}
+
+export function Sidebar({
+  site,
+  collapsed,
+  onCollapsedChange,
+  mobileOpen,
+  onMobileClose,
+}: SidebarProps) {
+  const baseUrl = getBaseUrl()
+  const routerState = useRouterState()
+  // Tanstack Router strips basepath from location.pathname,
+  // so we use the full browser URL for active-state matching.
+  const currentPath = window.location.pathname
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={onMobileClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-card transition-all duration-300',
+          collapsed ? 'w-16' : 'w-64',
+          'lg:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        )}
+      >
+        {/* Logo / Title */}
+        <div className="flex h-14 items-center border-b px-4">
+          {site.logo_url ? (
+            <Link to={'/' as AnyLinkTo} onClick={onMobileClose}>
+              <img
+                src={site.logo_url}
+                alt={site.title}
+                className={cn('h-8 object-contain', collapsed ? 'mx-auto' : '')}
+              />
+            </Link>
+          ) : (
+            <Link
+              to={'/' as AnyLinkTo}
+              onClick={onMobileClose}
+              className={cn(
+                'flex items-center gap-2 font-semibold text-foreground',
+                collapsed ? 'justify-center w-full' : ''
+              )}
+            >
+              <LayoutDashboard className="h-5 w-5 shrink-0" />
+              {!collapsed && <span className="truncate">{site.title}</span>}
+            </Link>
+          )}
+        </div>
+
+        {/* Menu */}
+        <nav className="flex-1 overflow-y-auto py-2">
+          {site.menu.map((item, i) => (
+            <SidebarMenuItem
+              key={`${item.name}-${i}`}
+              item={item}
+              collapsed={collapsed}
+              currentPath={currentPath}
+              baseUrl={baseUrl}
+              onNavigate={onMobileClose}
+            />
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="border-t p-2">
+          {site.has_auth && (
+            <Button
+              variant="ghost"
+              className={cn(
+                'w-full justify-start text-muted-foreground hover:text-foreground',
+                collapsed ? 'justify-center px-0' : ''
+              )}
+              onClick={async () => {
+                await logout()
+                window.location.href = `${baseUrl}/login`
+              }}
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>Logout</span>}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('w-full', collapsed ? '' : 'justify-end')}
+            onClick={() => {
+              const next = !collapsed
+              onCollapsedChange(next)
+            }}
+          >
+            {collapsed ? (
+              <PanelLeft className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+function SidebarMenuItem({
+  item,
+  collapsed,
+  currentPath,
+  baseUrl,
+  depth = 0,
+  onNavigate,
+}: {
+  item: MenuItem
+  collapsed: boolean
+  currentPath: string
+  baseUrl: string
+  depth?: number
+  onNavigate: () => void
+}) {
+  const [expanded, setExpanded] = React.useState(true)
+  const resolved = resolveIcon(item.icon)
+
+  if (item.type === 'category') {
+    if (collapsed) {
+      return (
+        <>
+          {item.children?.map((child, i) => (
+            <SidebarMenuItem
+              key={`${child.name}-${i}`}
+              item={child}
+              collapsed={collapsed}
+              currentPath={currentPath}
+              baseUrl={baseUrl}
+              depth={depth}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </>
+      )
+    }
+
+    return (
+      <div className="mt-2">
+        <button
+          className="flex w-full items-center gap-2 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+          <span>{item.name}</span>
+        </button>
+        {expanded && (
+          <div>
+            {item.children?.map((child, i) => (
+              <SidebarMenuItem
+                key={`${child.name}-${i}`}
+                item={child}
+                collapsed={collapsed}
+                currentPath={currentPath}
+                baseUrl={baseUrl}
+                depth={depth + 1}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const href = item.identity ? `/${item.identity}/list` : '/'
+  const identityPrefix = item.identity ? `${baseUrl}/${item.identity}` : null
+  const isActive =
+    identityPrefix
+      ? currentPath === identityPrefix ||
+        currentPath.startsWith(`${identityPrefix}/`)
+      : currentPath === baseUrl || currentPath === `${baseUrl}/`
+
+  return (
+    <Link
+      to={href as AnyLinkTo}
+      onClick={onNavigate}
+      className={cn(
+        'flex items-center gap-3 rounded-md mx-2 px-3 py-2 text-sm font-medium transition-colors',
+        isActive
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+        collapsed ? 'justify-center px-2' : '',
+        depth > 0 && !collapsed ? 'ml-4' : ''
+      )}
+      title={collapsed ? item.name : undefined}
+    >
+      {resolved.type === 'lucide' ? (
+        <resolved.icon className="h-4 w-4 shrink-0" />
+      ) : (
+        <SvgIcon svg={resolved.svg} className="h-4 w-4 shrink-0" />
+      )}
+      {!collapsed && <span className="truncate">{item.name}</span>}
+    </Link>
+  )
+}
+

@@ -1,5 +1,5 @@
-site_name: SQLAlchemy Admin
-site_description: Flexible admin dashboard for SQLAlchemy.
+site_name: spa-sqladmin
+site_description: React SPA admin for SQLAlchemy with FastAPI and Starlette.
 site_url: https://aminalaee.github.io/sqladmin/
 
 theme:
@@ -9,15 +9,14 @@ theme:
   features:
     - content.code.copy
 
-repo_name: aminalaee/sqladmin
-repo_url: https://github.com/aminalaee/sqladmin
+repo_name: SenZmaKi/spa-sqladmin
+repo_url: https://github.com/SenZmaKi/spa-sqladmin
 edit_uri: ""
 
 nav:
   - Introduction: "index.md"
   - Configurations: "configurations.md"
   - Authentication: "authentication.md"
-  - Working with Templates: "working_with_templates.md"
   - Working with Custom Views: "writing_custom_views.md"
   - Working with Files and Images: "working_with_files.md"
   - Model convertors: "model_convertors.md"
@@ -48,7 +47,7 @@ extra_css:
   - stylesheets/extra.css
 
 watch:
-  - sqladmin/
+  - spa_sqladmin/
 
 plugins:
   - search

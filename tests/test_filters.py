@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 from starlette.applications import Starlette
 
-from sqladmin import Admin, ModelView
-from sqladmin.filters import (
+from spa_sqladmin import Admin, ModelView
+from spa_sqladmin.filters import (
     AllUniqueStringValuesFilter,
     BooleanFilter,
     ForeignKeyFilter,
@@ -193,336 +193,356 @@ def assert_records_count(
 async def test_column_filters_sidebar_existence(client: AsyncClient) -> None:
     """Test that the filter list sidebar appears only when filters are defined."""
     # Test view with filters (UserAdmin)
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
     assert response.status_code == 200
-
-    # Check for the filter sidebar container
-    assert '<div id="filter-sidebar"' in response.text
+    data = response.json()
+    assert "filters" in data
+    assert len(data["filters"]) > 0
 
     # Test view without filters (AddressAdmin)
-    response = await client.get("/admin/address/list")
+    response = await client.get("/admin/api/address/list")
     assert response.status_code == 200
-
-    # Verify filter sidebar does not appear
-    assert '<div id="filter-sidebar"' not in response.text
+    data = response.json()
+    assert "filters" in data
+    assert len(data["filters"]) == 0
 
 
 @pytest.mark.anyio
 async def test_filter_lookups(client: AsyncClient) -> None:
     """Test that the filter lookups are correct."""
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
     assert response.status_code == 200
+    data = response.json()
 
-    # Check for the filter sidebar container
-    assert '<div id="filter-sidebar"' in response.text
+    filters_list = data["filters"]
+    assert len(filters_list) > 0
 
-    # Check for the filter lookups
-    assert "All" in response.text
-    assert "Manager" in response.text
-    assert "Developer" in response.text
-    assert "Yes" in response.text
-    assert "No" in response.text
+    # Check title filter (AllUniqueStringValuesFilter) has Manager and Developer options
+    title_filter = next((f for f in filters_list if f["name"] == "title"), None)
+    assert title_filter is not None
+    option_labels = [opt[1] for opt in title_filter["options"]]
+    assert "Manager" in option_labels
+    assert "Developer" in option_labels
+
+    # Check boolean filter (BooleanFilter) has Yes and No options
+    bool_filter = next((f for f in filters_list if f["name"] == "is_admin"), None)
+    assert bool_filter is not None
+    bool_labels = [opt[1] for opt in bool_filter["options"]]
+    assert "Yes" in bool_labels
+    assert "No" in bool_labels
+    assert "All" in bool_labels
 
 
 @pytest.mark.anyio
 async def test_boolean_filter_functionality(client: AsyncClient) -> None:
     """Test that boolean filters correctly filter users
     based on their is_admin status."""
-    # Test with no filter or 'all' filter - should show both users
-    response = await client.get("/admin/user/list?is_admin=all")
-
+    # Test with 'all' filter - should show all users
+    response = await client.get("/admin/api/user/list?is_admin=all")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" in response.text
-    assert_records_count(1, 2, 2, response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" in names
+    assert data["count"] == 3
 
     # Test filtering for admin users (is_admin=true)
-    response = await client.get("/admin/user/list?is_admin=true")
+    response = await client.get("/admin/api/user/list?is_admin=true")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" not in response.text
-    assert_records_count(1, 1, 1, response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert data["count"] == 1
 
     # Test filtering for non-admin users (is_admin=false)
-    response = await client.get("/admin/user/list?is_admin=false")
+    response = await client.get("/admin/api/user/list?is_admin=false")
     assert response.status_code == 200
-    assert "Admin User" not in response.text
-    assert "Regular User" in response.text
-    assert_records_count(1, 1, 1, response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" not in names
+    assert "Regular User" in names
+    assert data["count"] == 2
 
 
 @pytest.mark.anyio
 async def test_foreign_key_filter_functionality(client: AsyncClient) -> None:
     """Test that foreign key filters correctly filter users based on their office."""
-    response = await client.get("/admin/user/list")
+    response = await client.get("/admin/api/user/list")
     assert response.status_code == 200
-    assert "Office1" in response.text
-    assert "Office2" in response.text
-    assert_records_count(1, 2, 2, response.text)
+    data = response.json()
+    assert data["count"] == 3
 
-    response = await client.get("/admin/user/list?office_id=1")
+    # Verify office filter options include Office1 and Office2
+    filters_list = data["filters"]
+    office_filter = next((f for f in filters_list if f["name"] == "office_id"), None)
+    assert office_filter is not None
+    option_labels = [opt[1] for opt in office_filter["options"]]
+    assert "Office1" in option_labels
+    assert "Office2" in option_labels
+
+    response = await client.get("/admin/api/user/list?office_id=1")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" not in response.text
-    assert_records_count(1, 1, 1, response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert data["count"] == 2
 
 
 @pytest.mark.anyio
 async def test_static_values_filter_functionality(client: AsyncClient) -> None:
     """Test that static values filters correctly filter users based on their name."""
-    response = await client.get("/admin/user/list?static_name=Admin User")
+    response = await client.get("/admin/api/user/list?static_name=Admin User")
     assert response.status_code == 200
-    assert "adminadmin" in response.text
-    assert "Admin User" in response.text
-    assert "Regular User" not in response.text
-    assert_records_count(1, 1, 1, response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert data["count"] == 1
 
 
 @pytest.mark.anyio
 async def test_applied_filter_highlighting(client: AsyncClient) -> None:
-    """Test that applied filters are visually highlighted and have a clear button."""
+    """Test that applied filters correctly filter data (API-level behavior)."""
     # Test with is_admin=true filter applied
-    response = await client.get("/admin/user/list?is_admin=true")
+    response = await client.get("/admin/api/user/list?is_admin=true")
     assert response.status_code == 200
-
-    # Check that "Yes" option is highlighted with appropriate styling
-    # Applied filter should have bg-secondary-lt class
-    assert re.search(r'<div[^>]*class="[^"]*bg-secondary-lt[^"]*"[^>]*>', response.text)
-
-    # Check for fw-bold and text-dark classes in the span
-    assert re.search(
-        r'<span[^>]*class="[^"]*fw-bold[^"]*text-dark[^"]*"[^>]*>\s*Yes\s*</span>',
-        response.text,
-        re.DOTALL,
-    )
-
-    # Check for the clear button with fa-times icon and "Clear filter" title
-    assert 'title="Clear filter"' in response.text
-    assert re.search(
-        r'<i[^>]*class="[^"]*fa-solid[^"]*fa-times[^"]*"[^>]*>', response.text
-    )
-
-    # Check that "No" option is still a clickable link (not applied)
-    assert re.search(r'<a[^>]*href="[^"]*is_admin=false[^"]*"[^>]*>', response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert "Test User" not in names
 
     # Test with title filter applied
-    response = await client.get("/admin/user/list?title=Manager")
+    response = await client.get("/admin/api/user/list?title=Manager")
     assert response.status_code == 200
-
-    # Check that "Manager" is highlighted as applied filter with bg-secondary-lt
-    assert re.search(r'<div[^>]*class="[^"]*bg-secondary-lt[^"]*"[^>]*>', response.text)
-
-    # Check for fw-bold class and "Manager" text
-    assert re.search(
-        r'<span[^>]*class="[^"]*fw-bold[^"]*"[^>]*>\s*Manager\s*</span>',
-        response.text,
-        re.DOTALL,
-    )
-
-    # Check for the clear button
-    assert 'title="Clear filter"' in response.text
-
-    # Check that "Developer" is still a clickable link (not applied)
-    assert re.search(r'<a[^>]*href="[^"]*title=Developer[^"]*"[^>]*>', response.text)
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert "Test User" not in names
 
 
 @pytest.mark.anyio
 async def test_column_filter_string_operations(client: AsyncClient) -> None:
     """Test that ColumnFilter correctly handles string operations."""
     # Test contains operation
-    url = "/admin/user/list?name=Admin&name_op=contains"
-    response = await client.get(url)
+    response = await client.get("/admin/api/user/list?name=Admin&name_op=contains")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert "Test User" not in names
 
     # Test equals operation
-    url = "/admin/user/list?name=Test User&name_op=equals"
-    response = await client.get(url)
+    response = await client.get("/admin/api/user/list?name=Test User&name_op=equals")
     assert response.status_code == 200
-    assert "Test User" in response.text
-    assert "Admin User" not in response.text
-    assert "Regular User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Test User" in names
+    assert "Admin User" not in names
+    assert "Regular User" not in names
 
     # Test starts_with operation
-    url = "/admin/user/list?name=Regular&name_op=starts_with"
-    response = await client.get(url)
+    response = await client.get("/admin/api/user/list?name=Regular&name_op=starts_with")
     assert response.status_code == 200
-    assert "Regular User" in response.text
-    assert "Admin User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Regular User" in names
+    assert "Admin User" not in names
+    assert "Test User" not in names
 
     # Test ends_with operation
-    url = "/admin/user/list?name=User&name_op=ends_with"
-    response = await client.get(url)
+    response = await client.get("/admin/api/user/list?name=User&name_op=ends_with")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" in response.text
-    assert "Test User" in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" in names
+    assert "Test User" in names
 
 
 @pytest.mark.anyio
 async def test_column_filter_numeric_operations(client: AsyncClient) -> None:
     """Test that ColumnFilter correctly handles numeric operations."""
     # Test equals operation for age
-    response = await client.get("/admin/user/list?age=35&age_op=equals")
+    response = await client.get("/admin/api/user/list?age=35&age_op=equals")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert "Test User" not in names
 
     # Test greater_than operation for age
-    response = await client.get("/admin/user/list?age=30&age_op=greater_than")
+    response = await client.get("/admin/api/user/list?age=30&age_op=greater_than")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Test User" in response.text
-    assert "Regular User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Test User" in names
+    assert "Regular User" not in names
 
     # Test less_than operation for age
-    response = await client.get("/admin/user/list?age=30&age_op=less_than")
+    response = await client.get("/admin/api/user/list?age=30&age_op=less_than")
     assert response.status_code == 200
-    assert "Regular User" in response.text
-    assert "Admin User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Regular User" in names
+    assert "Admin User" not in names
+    assert "Test User" not in names
 
     # Test equals operation for salary (float)
-    url = "/admin/user/list?salary=55000.75&salary_op=equals"
-    response = await client.get(url)
+    response = await client.get("/admin/api/user/list?salary=55000.75&salary_op=equals")
     assert response.status_code == 200
-    assert "Regular User" in response.text
-    assert "Admin User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Regular User" in names
+    assert "Admin User" not in names
+    assert "Test User" not in names
 
     # Test greater_than operation for salary
-    url = "/admin/user/list?salary=60000&salary_op=greater_than"
-    response = await client.get(url)
+    response = await client.get("/admin/api/user/list?salary=60000&salary_op=greater_than")
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Test User" in response.text
-    assert "Regular User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Test User" in names
+    assert "Regular User" not in names
 
 
 @pytest.mark.anyio
 async def test_column_filter_description_operations(client: AsyncClient) -> None:
     """Test ColumnFilter string operations on description field."""
     # Test contains operation
-    url = "/admin/user/list?description=administrator&description_op=contains"
-    response = await client.get(url)
+    response = await client.get(
+        "/admin/api/user/list?description=administrator&description_op=contains"
+    )
     assert response.status_code == 200
-    assert "Admin User" in response.text
-    assert "Regular User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" not in names
+    assert "Test User" not in names
 
     # Test contains operation - case insensitive
-    url = "/admin/user/list?description=SOFTWARE&description_op=contains"
-    response = await client.get(url)
+    response = await client.get(
+        "/admin/api/user/list?description=SOFTWARE&description_op=contains"
+    )
     assert response.status_code == 200
-    assert "Regular User" in response.text
-    assert "Admin User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Regular User" in names
+    assert "Admin User" not in names
+    assert "Test User" not in names
 
     # Test starts_with operation
-    url = "/admin/user/list?description=Data&description_op=starts_with"
-    response = await client.get(url)
+    response = await client.get(
+        "/admin/api/user/list?description=Data&description_op=starts_with"
+    )
     assert response.status_code == 200
-    assert "Test User" in response.text
-    assert "Admin User" not in response.text
-    assert "Regular User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Test User" in names
+    assert "Admin User" not in names
+    assert "Regular User" not in names
 
     # Test ends_with operation
-    url = "/admin/user/list?description=applications&description_op=ends_with"
-    response = await client.get(url)
+    response = await client.get(
+        "/admin/api/user/list?description=applications&description_op=ends_with"
+    )
     assert response.status_code == 200
-    assert "Regular User" in response.text
-    assert "Admin User" not in response.text
-    assert "Test User" not in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Regular User" in names
+    assert "Admin User" not in names
+    assert "Test User" not in names
 
 
 @pytest.mark.anyio
 async def test_column_filter_dropdown_ui_presence(client: AsyncClient) -> None:
-    """Test that ColumnFilter provides dropdown UI elements."""
-    response = await client.get("/admin/user/list")
+    """Test that ColumnFilter provides filter definitions with operations in the API."""
+    response = await client.get("/admin/api/user/list")
     assert response.status_code == 200
+    data = response.json()
 
-    # Check for the filter sidebar container
-    assert '<div id="filter-sidebar"' in response.text
+    filters_list = data["filters"]
+    assert len(filters_list) > 0
 
-    # Check for dropdown operation selectors for ColumnFilter fields (has_operator=True)
-    # Name filter dropdown (string operations)
-    assert 'name="name_op"' in response.text
-    assert 'class="form-select form-select-sm"' in response.text
-    assert "Select operation..." in response.text
-    assert '<option value="contains"' in response.text
-    assert '<option value="equals"' in response.text
-    assert '<option value="starts_with"' in response.text
-    assert '<option value="ends_with"' in response.text
+    # Build a dict of filters with has_operator=True
+    op_filters = {f["name"]: f for f in filters_list if f["has_operator"]}
 
-    # Age filter dropdown (numeric operations)
-    assert 'name="age_op"' in response.text
-    assert '<option value="greater_than"' in response.text
-    assert '<option value="less_than"' in response.text
+    # Name filter should have string operations
+    assert "name" in op_filters
+    name_ops = [op[0] for op in op_filters["name"]["operations"]]
+    assert "contains" in name_ops
+    assert "equals" in name_ops
+    assert "starts_with" in name_ops
+    assert "ends_with" in name_ops
 
-    # Salary filter dropdown (numeric operations)
-    assert 'name="salary_op"' in response.text
+    # Age filter should have numeric operations
+    assert "age" in op_filters
+    age_ops = [op[0] for op in op_filters["age"]["operations"]]
+    assert "greater_than" in age_ops
+    assert "less_than" in age_ops
 
-    # Description filter dropdown (string operations)
-    assert 'name="description_op"' in response.text
+    # Salary filter should be present
+    assert "salary" in op_filters
 
-    # UUID filter dropdown if supported
+    # Description filter should be present
+    assert "description" in op_filters
+
+    # UUID filter if supported
     if HAS_UUID_SUPPORT and hasattr(User, "user_uuid"):
-        assert 'name="user_uuid_op"' in response.text
-
-    # Check for text input fields for filter values
-    assert 'name="name"' in response.text
-    assert 'placeholder="Enter value"' in response.text
-    assert 'class="form-control form-control-sm"' in response.text
-
-    # Check for Apply Filter buttons
-    assert "Apply Filter" in response.text
-    assert 'type="submit"' in response.text
-    assert 'class="btn btn-sm btn-outline-primary"' in response.text
+        assert "user_uuid" in op_filters
 
 
 @pytest.mark.anyio
 async def test_column_filter_invalid_values(client: AsyncClient) -> None:
     """Test that ColumnFilter handles invalid values gracefully."""
     # Test invalid numeric value for age
-    response = await client.get("/admin/user/list?age=invalid&age_op=equals")
+    response = await client.get("/admin/api/user/list?age=invalid&age_op=equals")
     assert response.status_code == 200
-    # Should show all users when invalid value is provided
-    assert "Admin User" in response.text
-    assert "Regular User" in response.text
-    assert "Test User" in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" in names
+    assert "Test User" in names
 
     # Test invalid numeric value for salary
-    url = "/admin/user/list?salary=not_a_number&salary_op=greater_than"
-    response = await client.get(url)
+    response = await client.get(
+        "/admin/api/user/list?salary=not_a_number&salary_op=greater_than"
+    )
     assert response.status_code == 200
-    # Should show all users when invalid value is provided
-    assert "Admin User" in response.text
-    assert "Regular User" in response.text
-    assert "Test User" in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" in names
+    assert "Test User" in names
 
 
 @pytest.mark.anyio
 async def test_column_filter_empty_values(client: AsyncClient) -> None:
     """Test that ColumnFilter handles empty values gracefully."""
     # Test empty value for string field
-    response = await client.get("/admin/user/list?name=&name_op=contains")
+    response = await client.get("/admin/api/user/list?name=&name_op=contains")
     assert response.status_code == 200
-    # Should show all users when empty value is provided
-    assert "Admin User" in response.text
-    assert "Regular User" in response.text
-    assert "Test User" in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" in names
+    assert "Test User" in names
 
     # Test empty value for numeric field
-    response = await client.get("/admin/user/list?age=&age_op=equals")
+    response = await client.get("/admin/api/user/list?age=&age_op=equals")
     assert response.status_code == 200
-    # Should show all users when empty value is provided
-    assert "Admin User" in response.text
-    assert "Regular User" in response.text
-    assert "Test User" in response.text
+    data = response.json()
+    names = [row["name"] for row in data["rows"]]
+    assert "Admin User" in names
+    assert "Regular User" in names
+    assert "Test User" in names
 
 
 @pytest.mark.skipif(
@@ -555,28 +575,34 @@ async def test_column_filter_uuid_operations(client: AsyncClient) -> None:
         uuid_str = str(test_uuid)
         partial_uuid = uuid_str[:8]  # Use first 8 characters
 
-        url = f"/admin/user/list?user_uuid={partial_uuid}&user_uuid_op=contains"
+        url = f"/admin/api/user/list?user_uuid={partial_uuid}&user_uuid_op=contains"
         response = await client.get(url)
         assert response.status_code == 200
-        assert "UUID User" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "UUID User" in names
 
         # Test UUID starts_with operation
-        url = f"/admin/user/list?user_uuid={partial_uuid}&user_uuid_op=starts_with"
+        url = f"/admin/api/user/list?user_uuid={partial_uuid}&user_uuid_op=starts_with"
         response = await client.get(url)
         assert response.status_code == 200
-        assert "UUID User" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "UUID User" in names
 
         # Test UUID equals operation (full UUID)
-        url = f"/admin/user/list?user_uuid={uuid_str}&user_uuid_op=equals"
+        url = f"/admin/api/user/list?user_uuid={uuid_str}&user_uuid_op=equals"
         response = await client.get(url)
         assert response.status_code == 200
-        assert "UUID User" in response.text
+        data = response.json()
+        names = [row["name"] for row in data["rows"]]
+        assert "UUID User" in names
 
 
 @pytest.mark.anyio
 async def test_column_filter_edge_cases():
     """Test edge cases for ColumnFilter"""
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     # Test with empty/None values
     column_filter = OperationColumnFilter(User.name)
@@ -607,7 +633,7 @@ async def test_column_filter_edge_cases():
 @pytest.mark.anyio
 async def test_column_filter_type_detection():
     """Test ColumnFilter type detection methods"""
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     filter_instance = OperationColumnFilter(User.name)
 
@@ -663,7 +689,7 @@ async def test_column_filter_operations_comprehensive(client: AsyncClient) -> No
 @pytest.mark.anyio
 async def test_column_filter_operation_options():
     """Test ColumnFilter operation options for different column types"""
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     # Test string column operation options
     name_filter = OperationColumnFilter(User.name)
@@ -694,7 +720,7 @@ async def test_column_filter_operation_options():
 @pytest.mark.anyio
 async def test_column_filter_lookups_method():
     """Test ColumnFilter lookups method (returns empty for has_operator filters)"""
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     filter_instance = OperationColumnFilter(User.name)
 
@@ -714,7 +740,7 @@ async def test_column_filter_unknown_operation():
     """Test ColumnFilter with unknown operation type"""
     from sqlalchemy.sql.expression import select
 
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     filter_instance = OperationColumnFilter(User.name)
 
@@ -731,7 +757,7 @@ async def test_column_filter_unknown_operation():
 @pytest.mark.anyio
 async def test_column_filter_conversion_edge_cases():
     """Test ColumnFilter value conversion edge cases"""
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     filter_instance = OperationColumnFilter(User.name)
 
@@ -772,7 +798,7 @@ async def test_column_filter_uuid_conversion():
     """Test ColumnFilter UUID value conversion"""
     import uuid
 
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     if hasattr(User, "user_uuid"):
         filter_instance = OperationColumnFilter(User.user_uuid)
@@ -805,7 +831,7 @@ async def test_column_filter_no_operation_or_value():
     """Test ColumnFilter behavior with missing operation or value"""
     from sqlalchemy.sql.expression import select
 
-    from sqladmin.filters import OperationColumnFilter
+    from spa_sqladmin.filters import OperationColumnFilter
 
     filter_instance = OperationColumnFilter(User.name)
     stmt = select(User)

@@ -1,32 +1,32 @@
 <p align="center">
-<a href="https://github.com/aminalaee/sqladmin">
-    <img width="400px" src="https://raw.githubusercontent.com/aminalaee/sqladmin/main/docs/assets/images/banner.png" alt"SQLAdmin">
+<a href="https://github.com/senzmaki/spa-sqladmin">
+    <img width="400px" src="https://raw.githubusercontent.com/senzmaki/spa-sqladmin/main/docs/assets/images/banner.png" alt"SQLAdmin">
 </a>
 </p>
 
 <p align="center">
-<a href="https://github.com/aminalaee/sqladmin/actions">
-    <img src="https://github.com/aminalaee/sqladmin/workflows/Test%20Suite/badge.svg" alt="Build Status">
+<a href="https://github.com/senzmaki/spa-sqladmin/actions">
+    <img src="https://github.com/senzmaki/spa-sqladmin/workflows/Test%20Suite/badge.svg" alt="Build Status">
 </a>
-<a href="https://github.com/aminalaee/sqladmin/actions">
-    <img src="https://github.com/aminalaee/sqladmin/workflows/Publish/badge.svg" alt="Publish Status">
+<a href="https://github.com/senzmaki/spa-sqladmin/actions">
+    <img src="https://github.com/senzmaki/spa-sqladmin/workflows/Publish/badge.svg" alt="Publish Status">
 </a>
-<a href="https://codecov.io/gh/aminalaee/sqladmin">
-    <img src="https://codecov.io/gh/aminalaee/sqladmin/branch/main/graph/badge.svg" alt="Coverage">
+<a href="https://codecov.io/gh/SenZmaKi/spa-sqladmin">
+    <img src="https://codecov.io/gh/SenZmaKi/spa-sqladmin/branch/main/graph/badge.svg" alt="Coverage">
 </a>
-<a href="https://pypi.org/project/sqladmin/">
-    <img src="https://badge.fury.io/py/sqladmin.svg" alt="Package version">
+<a href="https://pypi.org/project/spa-sqladmin/">
+    <img src="https://badge.fury.io/py/spa-sqladmin.svg" alt="Package version">
 </a>
-<a href="https://pypi.org/project/sqladmin" target="_blank">
-    <img src="https://img.shields.io/pypi/pyversions/sqladmin.svg?color=%2334D058" alt="Supported Python versions">
+<a href="https://pypi.org/project/spa-sqladmin" target="_blank">
+    <img src="https://img.shields.io/pypi/pyversions/spa-sqladmin.svg?color=%2334D058" alt="Supported Python versions">
 </a>
 </p>
 
 ---
 
-# SQLAlchemy Admin for Starlette/FastAPI
+# spa-sqladmin: React SPA Admin for Starlette/FastAPI
 
-SQLAdmin is a flexible Admin interface for SQLAlchemy models.
+`spa-sqladmin` is a modern admin interface for SQLAlchemy models backed by a React SPA frontend.
 
 Main features include:
 
@@ -35,13 +35,13 @@ Main features include:
 * [FastAPI](https://github.com/tiangolo/fastapi) integration
 * [WTForms](https://github.com/wtforms/wtforms) form building
 * [SQLModel](https://github.com/tiangolo/sqlmodel) support
-* UI using [Tabler](https://github.com/tabler/tabler)
+* Modern React SPA UI with [Shadcn UI](https://ui.shadcn.com/), [Tanstack Router](https://tanstack.com/router), [Tanstack Table](https://tanstack.com/table), and [Tanstack Query](https://tanstack.com/query)
 
 ---
 
 **Documentation**: [https://aminalaee.github.io/sqladmin](https://aminalaee.github.io/sqladmin)
 
-**Source Code**: [https://github.com/aminalaee/sqladmin](https://github.com/aminalaee/sqladmin)
+**Source Code**: [https://github.com/senzmaki/spa-sqladmin](https://github.com/senzmaki/spa-sqladmin)
 
 **Online Demo**: [Demo](https://sqladmin-demo.aminalaee.dev/admin/)
 
@@ -50,8 +50,9 @@ Main features include:
 ## Installation
 
 ```shell
-$ pip install sqladmin
-$ pip install sqladmin[full]
+$ pip install git+https://github.com/SenZmaKi/spa-sqladmin.git
+# with optional dependencies
+$ pip install "spa-sqladmin[full] @ git+https://github.com/SenZmaKi/spa-sqladmin.git"
 ```
 
 ---
@@ -91,7 +92,7 @@ If you want to use `SQLAdmin` with `FastAPI`:
 
 ```python
 from fastapi import FastAPI
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 
 
 app = FastAPI()
@@ -108,7 +109,7 @@ admin.add_view(UserAdmin)
 Or if you want to use `SQLAdmin` with `Starlette`:
 
 ```python
-from sqladmin import Admin, ModelView
+from spa_sqladmin import Admin, ModelView
 from starlette.applications import Starlette
 
 

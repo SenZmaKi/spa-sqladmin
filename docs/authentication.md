@@ -13,8 +13,8 @@ The class `AuthenticationBackend` has three methods you need to override:
 * `logout`: Will be called only for the logout, usually clearing the session.
 
 ```python
-from sqladmin import Admin
-from sqladmin.authentication import AuthenticationBackend
+from spa_sqladmin import Admin
+from spa_sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
@@ -55,8 +55,8 @@ admin = Admin(app=..., authentication_backend=authentication_backend، ...)
 ??? example "Full Example"
 
     ```python
-    from sqladmin import Admin, ModelView
-    from sqladmin.authentication import AuthenticationBackend
+    from spa_sqladmin import Admin, ModelView
+    from spa_sqladmin.authentication import AuthenticationBackend
     from sqlalchemy import Column, Integer, String, create_engine
     from sqlalchemy.orm import declarative_base
     from starlette.applications import Starlette
@@ -125,7 +125,7 @@ If you have followed the previous example, there are only two changes required t
 from typing import Union
 
 from authlib.integrations.starlette_client import OAuth
-from sqladmin.authentication import AuthenticationBackend
+from spa_sqladmin.authentication import AuthenticationBackend
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request

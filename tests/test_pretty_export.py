@@ -7,8 +7,8 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from starlette.responses import StreamingResponse
 
-from sqladmin import ModelView
-from sqladmin.pretty_export import PrettyExport
+from spa_sqladmin import ModelView
+from spa_sqladmin.pretty_export import PrettyExport
 from tests.common import sync_engine as engine
 
 pytestmark = pytest.mark.anyio

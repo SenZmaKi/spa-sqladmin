@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import declarative_base, relationship, selectinload, sessionmaker
 from starlette.applications import Starlette
 
-from sqladmin import Admin, ModelView
-from sqladmin.ajax import create_ajax_loader
+from spa_sqladmin import Admin, ModelView
+from spa_sqladmin.ajax import create_ajax_loader
 from tests.common import async_engine as engine
 
 pytestmark = pytest.mark.anyio
@@ -131,13 +131,13 @@ async def client(prepare_database: Any) -> AsyncGenerator[AsyncClient, None]:
 
 
 async def test_ajax_lookup_invalid_query_params(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/ajax/lookup")
+    response = await client.get("/admin/api/user/ajax/lookup")
     assert response.status_code == 400
 
-    response = await client.get("/admin/address/ajax/lookup")
+    response = await client.get("/admin/api/address/ajax/lookup")
     assert response.status_code == 400
 
-    response = await client.get("/admin/user/ajax/lookup?name=test&term=x")
+    response = await client.get("/admin/api/user/ajax/lookup?name=test&term=x")
     assert response.status_code == 400
 
 
@@ -147,7 +147,7 @@ async def test_ajax_response_test(client: AsyncClient) -> None:
         s.add(user)
         await s.commit()
 
-    response = await client.get("/admin/address/ajax/lookup?name=user&term=john")
+    response = await client.get("/admin/api/address/ajax/lookup?name=user&term=john")
 
     assert response.status_code == 200
     assert response.json() == {"results": [{"id": "1", "text": "User 1"}]}
@@ -162,7 +162,7 @@ async def test_ajax_response_order_by(client: AsyncClient) -> None:
         s.add(City(name="Melbourne", state="TAS"))
         await s.commit()
 
-    response = await client.get("/admin/address/ajax/lookup?name=city&term=nsw")
+    response = await client.get("/admin/api/address/ajax/lookup?name=city&term=nsw")
     # Sorted by state then id
     assert response.status_code == 200
     assert response.json() == {
@@ -172,7 +172,7 @@ async def test_ajax_response_order_by(client: AsyncClient) -> None:
         ]
     }
 
-    response = await client.get("/admin/room/ajax/lookup?name=city&term=nsw")
+    response = await client.get("/admin/api/room/ajax/lookup?name=city&term=nsw")
     # Sorted by state then name
     assert response.status_code == 200
     assert response.json() == {
@@ -181,7 +181,7 @@ async def test_ajax_response_order_by(client: AsyncClient) -> None:
             {"id": "3", "text": "Newcastle, NSW"},
         ]
     }
-    response = await client.get("/admin/room/ajax/lookup?name=city&term=melb")
+    response = await client.get("/admin/api/room/ajax/lookup?name=city&term=melb")
     # Sorted by state then name
     assert response.status_code == 200
     assert response.json() == {
@@ -200,7 +200,7 @@ async def test_ajax_response_limit(client: AsyncClient) -> None:
             s.add(user)
         await s.commit()
 
-    response = await client.get("/admin/address/ajax/lookup?name=user&term=john")
+    response = await client.get("/admin/api/address/ajax/lookup?name=user&term=john")
 
     assert response.status_code == 200
     # Address admin has no limit so will return all created users
@@ -211,7 +211,7 @@ async def test_ajax_response_limit(client: AsyncClient) -> None:
         ]
     }
 
-    response = await client.get("/admin/room/ajax/lookup?name=user&term=john")
+    response = await client.get("/admin/api/room/ajax/lookup?name=user&term=john")
 
     assert response.status_code == 200
     # Room admin has a limit 3 of
@@ -229,16 +229,18 @@ async def test_create_ajax_loader_exceptions() -> None:
 
 
 async def test_create_page_template(client: AsyncClient) -> None:
-    response = await client.get("/admin/user/create")
+    # Form schema for ajax-backed fields includes ajax_url
+    response = await client.get("/admin/api/user/form-schema")
+    assert response.status_code == 200
+    data = response.json()
+    ajax_fields = [f for f in data["fields"] if f.get("ajax_url")]
+    assert any("/admin/api/user/ajax/lookup" in f["ajax_url"] for f in ajax_fields)
 
-    assert 'data-json="[]"' in response.text
-    assert 'data-role="select2-ajax"' in response.text
-    assert 'data-url="/admin/user/ajax/lookup"' in response.text
-
-    response = await client.get("/admin/address/create")
-
-    assert 'data-role="select2-ajax"' in response.text
-    assert 'data-url="/admin/address/ajax/lookup"' in response.text
+    response = await client.get("/admin/api/address/form-schema")
+    assert response.status_code == 200
+    data = response.json()
+    ajax_fields = [f for f in data["fields"] if f.get("ajax_url")]
+    assert any("/admin/api/address/ajax/lookup" in f["ajax_url"] for f in ajax_fields)
 
 
 async def test_edit_page_template(client: AsyncClient) -> None:
@@ -251,36 +253,41 @@ async def test_edit_page_template(client: AsyncClient) -> None:
         s.add(address)
         await s.commit()
 
-    response = await client.get("/admin/user/edit/1")
-    assert (
-        'data-json="[{&#34;id&#34;: &#34;1&#34;, &#34;text&#34;: &#34;Address 1&#34;}]"'
-        in response.text
-    )
-    assert 'data-role="select2-ajax"' in response.text
-    assert 'data-url="/admin/user/ajax/lookup"' in response.text
+    # Edit form schema for user includes ajax fields with current value
+    response = await client.get("/admin/api/user/form-schema?action=edit&pk=1")
+    assert response.status_code == 200
+    data = response.json()
+    ajax_fields = {f["name"]: f for f in data["fields"] if f.get("ajax_url")}
+    assert "addresses" in ajax_fields
+    assert "/admin/api/user/ajax/lookup" in ajax_fields["addresses"]["ajax_url"]
 
-    response = await client.get("/admin/address/edit/1")
-    assert (
-        'data-json="[{&#34;id&#34;: &#34;1&#34;, &#34;text&#34;: &#34;User 1&#34;}]"'
-        in response.text
-    )
-    assert 'data-role="select2-ajax"' in response.text
-    assert 'data-url="/admin/address/ajax/lookup"' in response.text
+    # Edit form schema for address includes user ajax field with value
+    response = await client.get("/admin/api/address/form-schema?action=edit&pk=1")
+    assert response.status_code == 200
+    data = response.json()
+    ajax_fields = {f["name"]: f for f in data["fields"] if f.get("ajax_url")}
+    assert "user" in ajax_fields
+    assert "/admin/api/address/ajax/lookup" in ajax_fields["user"]["ajax_url"]
 
 
 async def test_create_and_edit_forms(client: AsyncClient) -> None:
-    response = await client.post("/admin/address/create", data={})
-    assert response.status_code == 302
-    response = await client.post("/admin/address/create", data={"id": "2"})
-    assert response.status_code == 302
+    # Create address (no required fields — should succeed)
+    response = await client.post("/admin/api/address/create", data={})
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+    response = await client.post("/admin/api/address/create", data={"id": "2"})
+    assert response.status_code == 200
+    assert response.json()["success"] is True
 
     data = {"addresses": ["1"], "name": "Tyrion"}
-    response = await client.post("/admin/user/create", data=data)
-    assert response.status_code == 302
+    response = await client.post("/admin/api/user/create", data=data)
+    assert response.status_code == 200
+    assert response.json()["success"] is True
 
     data = {}
-    response = await client.post("/admin/address/edit/1", data=data)
-    assert response.status_code == 302
+    response = await client.post("/admin/api/address/edit/1", data=data)
+    assert response.status_code == 200
 
     async with session_maker() as s:
         stmt = select(User).options(selectinload(User.addresses))
@@ -290,8 +297,8 @@ async def test_create_and_edit_forms(client: AsyncClient) -> None:
     assert len(user.addresses) == 0
 
     data = {"addresses": ["1"]}
-    response = await client.post("/admin/user/edit/1", data=data)
-    assert response.status_code == 302
+    response = await client.post("/admin/api/user/edit/1", data=data)
+    assert response.status_code == 200
 
     async with session_maker() as s:
         stmt = select(User).options(selectinload(User.addresses))
@@ -301,8 +308,8 @@ async def test_create_and_edit_forms(client: AsyncClient) -> None:
     assert len(user.addresses) == 1
 
     data = {"addresses": ["1", "2"]}
-    response = await client.post("/admin/user/edit/1", data=data)
-    assert response.status_code == 302
+    response = await client.post("/admin/api/user/edit/1", data=data)
+    assert response.status_code == 200
 
     async with session_maker() as s:
         stmt = select(User).options(selectinload(User.addresses))
