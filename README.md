@@ -117,7 +117,7 @@ admin.add_view(UserAdmin)
 
 Now visiting `/admin` on your browser you can see the `SQLAdmin` interface.
 
-Find an extensive example in the [examples](https://github.com/SenZmaKi/spa-sqladmin/tree/main/example) folder.
+Find an extensive example in the [example](https://github.com/SenZmaKi/spa-sqladmin/tree/main/example) folder.
 
 ## Acknowledgements
 
