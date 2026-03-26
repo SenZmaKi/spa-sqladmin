@@ -765,12 +765,25 @@ def _json_to_formdata(data: dict) -> FormData:
 
 def _normalize_datetime_str(value: str) -> str:
     """Convert ISO 8601 datetime strings to WTForms-compatible format."""
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timezone as tz
 
-    # Try ISO 8601 formats (from JS Date.toISOString())
+    # Strip trailing Z (UTC) and replace with +00:00 for fromisoformat compatibility
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+
+    # Try fromisoformat first — handles timezone-aware strings like "2026-03-07T11:33:31+03:00"
+    try:
+        parsed = dt.fromisoformat(normalized)
+        # Strip timezone info so WTForms (which expects naive datetimes) accepts it
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(tz.utc).replace(tzinfo=None)
+        return parsed.strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        pass
+
+    # Fallback: try explicit strptime formats
     for fmt in (
-        "%Y-%m-%dT%H:%M:%S.%fZ",
-        "%Y-%m-%dT%H:%M:%SZ",
         "%Y-%m-%dT%H:%M:%S.%f",
         "%Y-%m-%dT%H:%M:%S",
         "%Y-%m-%dT%H:%M",

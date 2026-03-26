@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from '@tanstack/react-router'
 import { AppLayout } from '@/components/layout/app-layout'
 import { useSite } from '@/hooks/use-site'
-import { mapFaToLucide } from '@/components/layout/sidebar'
+import { resolveIcon, SvgIcon } from '@/components/layout/sidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -155,14 +155,18 @@ function ModelCard({
 }: {
   model: ModelInfo
 }) {
-  const Icon = mapFaToLucide(model.icon)
+  const resolved = resolveIcon(model.icon)
 
   return (
     <Card className="group hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Icon className="h-4 w-4" />
+            {resolved.type === 'lucide' ? (
+              <resolved.icon className="h-4 w-4" />
+            ) : (
+              <SvgIcon svg={resolved.svg} className="h-4 w-4" />
+            )}
           </div>
           <span>{model.name_plural}</span>
         </CardTitle>
