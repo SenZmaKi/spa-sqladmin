@@ -126,6 +126,8 @@ admin.add_view(UserAdmin)
 
 Now visiting `/admin` on your browser you can see the `SQLAdmin` interface.
 
+For a full overview of `Admin(...)` parameters, icon formats, palette syntax, and custom admin patterns, see the [Usage Guide](USAGE.md).
+
 ## Related projects and inspirations
 
 * [Flask-Admin](https://github.com/flask-admin/flask-admin) Admin interface for Flask supporting different database backends and ORMs. This project has inspired SQLAdmin extensively and most of the features and configurations are implemented the same.

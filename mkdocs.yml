@@ -16,6 +16,7 @@ edit_uri: ""
 nav:
   - Introduction: "index.md"
   - Configurations: "configurations.md"
+  - Usage Guide: "USAGE.md"
   - Authentication: "authentication.md"
   - Working with Custom Views: "writing_custom_views.md"
   - Working with Files and Images: "working_with_files.md"

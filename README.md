@@ -119,6 +119,8 @@ Now visiting `/admin` on your browser you can see the `SQLAdmin` interface.
 
 Find an extensive example in the [example](https://github.com/SenZmaKi/spa-sqladmin/tree/main/example) folder.
 
+For a full overview of `Admin(...)` parameters, icon formats, palette syntax, and custom admin patterns, see [`docs/USAGE.md`](docs/USAGE.md).
+
 ## Acknowledgements
 
 This project would not have been possible without [sqladmin](https://github.com/aminalaee/sqladmin).
