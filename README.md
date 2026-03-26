@@ -50,8 +50,8 @@ $ uv add "spa-sqladmin @ git+https://github.com/SenZmaKi/spa-sqladmin.git"
 
 ## Screenshots
 
-<img width="1492" alt="spa-sqladmin-screenshot-1" src="https://raw.githubusercontent.com/SenZmaKi/spa-sqladmin/main/.github/images/screenshot-1.png">
-<img width="1492" alt="spa-sqladmin-screenshot-2" src="https://raw.githubusercontent.com/SenZmaKi/spa-sqladmin/main/.github/images/screenshot-2.png">
+<img width="1492" alt="spa-sqladmin-screenshot-1" src="https://raw.githubusercontent.com/SenZmaKi/spa-sqladmin/main/docs/assets/images/screenshot-1.png">
+<img width="1492" alt="spa-sqladmin-screenshot-2" src="https://raw.githubusercontent.com/SenZmaKi/spa-sqladmin/main/docs/assets/images/screenshot-2.png">
 
 ## Quickstart
 
