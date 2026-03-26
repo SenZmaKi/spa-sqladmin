@@ -26,7 +26,7 @@ export function LoginPage() {
       return login(formData)
     },
     onSuccess: () => {
-      navigate({ to: baseUrl })
+      navigate({ to: '/' })
     },
     onError: (err: Error) => {
       setErrorMessage(err.message || 'Invalid credentials')

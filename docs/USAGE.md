@@ -69,7 +69,7 @@ Admin(
 | `session_maker` | `sessionmaker` or `async_sessionmaker` | Optional custom session factory. Use this when you need to control session creation yourself. |
 | `base_url` | `str` | Mount point for the admin UI and API. Defaults to `"/admin"`. |
 | `title` | `str` | Used for the browser title and the sidebar heading. |
-| `logo_url` | `str \| None` | Image URL shown in the sidebar instead of plain title text. Data URLs also work. |
+| `logo_url` | `str \| None` | Image URL shown in the sidebar alongside the title. Data URLs also work. |
 | `favicon_url` | `str \| None` | Browser-tab favicon URL. Data URLs also work. |
 | `color_palette` | `dict[str, dict[str, str]] \| None` | Optional theme token overrides for light and dark mode. |
 | `middlewares` | `Sequence[Middleware] \| None` | Extra Starlette middlewares added to the mounted admin app. |
@@ -153,7 +153,7 @@ This value is used in the HTML title and in the admin site metadata returned to 
 
 ### `logo_url`
 
-`logo_url` is for the large brand image in the sidebar. It is not the same thing as a menu icon.
+`logo_url` is for the brand image in the sidebar. When provided, it is shown alongside the `title` text — both are visible at the same time. It is not the same thing as a menu icon.
 
 Accepted values:
 

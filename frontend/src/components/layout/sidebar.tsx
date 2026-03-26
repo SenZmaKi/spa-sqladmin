@@ -3,6 +3,14 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { getBaseUrl, logout } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { useUIStore } from '@/stores/ui-store'
 import type { MenuItem, SiteData } from '@/lib/types'
 
@@ -281,6 +289,7 @@ export function Sidebar({
 }: SidebarProps) {
   const baseUrl = getBaseUrl()
   const routerState = useRouterState()
+  const [showLogoutDialog, setShowLogoutDialog] = React.useState(false)
   // Tanstack Router strips basepath from location.pathname,
   // so we use the full browser URL for active-state matching.
   const currentPath = window.location.pathname
@@ -307,12 +316,20 @@ export function Sidebar({
         {/* Logo / Title */}
         <div className="flex h-14 items-center border-b px-4">
           {site.logo_url ? (
-            <Link to={'/' as AnyLinkTo} onClick={onMobileClose}>
+            <Link
+              to={'/' as AnyLinkTo}
+              onClick={onMobileClose}
+              className={cn(
+                'flex items-center gap-2 font-semibold text-foreground',
+                collapsed ? 'justify-center w-full' : ''
+              )}
+            >
               <img
                 src={site.logo_url}
                 alt={site.title}
-                className={cn('h-8 object-contain', collapsed ? 'mx-auto' : '')}
+                className="h-8 object-contain shrink-0"
               />
+              {!collapsed && <span className="truncate">{site.title}</span>}
             </Link>
           ) : (
             <Link
@@ -346,20 +363,44 @@ export function Sidebar({
         {/* Footer */}
         <div className="border-t p-2">
           {site.has_auth && (
-            <Button
-              variant="ghost"
-              className={cn(
-                'w-full justify-start text-muted-foreground hover:text-foreground',
-                collapsed ? 'justify-center px-0' : ''
-              )}
-              onClick={async () => {
-                await logout()
-                window.location.href = `${baseUrl}/login`
-              }}
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>Logout</span>}
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                className={cn(
+                  'w-full justify-start text-muted-foreground hover:text-foreground',
+                  collapsed ? 'justify-center px-0' : ''
+                )}
+                onClick={() => setShowLogoutDialog(true)}
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>Logout</span>}
+              </Button>
+              <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Sign out</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to sign out?
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowLogoutDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={async () => {
+                        setShowLogoutDialog(false)
+                        await logout()
+                        window.location.href = `${baseUrl}/login`
+                      }}
+                    >
+                      Sign out
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
           <Button
             variant="ghost"
