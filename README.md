@@ -1,6 +1,6 @@
 <p align="center">
 <a href="https://github.com/senzmaki/spa-sqladmin">
-    <img width="400px" src="https://raw.githubusercontent.com/senzmaki/spa-sqladmin/main/docs/assets/images/banner.png" alt"SQLAdmin">
+    <img width="400px" src="https://raw.githubusercontent.com/senzmaki/spa-sqladmin/main/docs/assets/images/banner.jpg" alt"SQLAdmin">
 </a>
 </p>
 
@@ -50,8 +50,8 @@ $ uv add "spa-sqladmin @ git+https://github.com/SenZmaKi/spa-sqladmin.git"
 
 ## Screenshots
 
-<img width="1492" alt="spa-sqladmin-screenshot-1" src="./.github/images/screenshot-1.png">
-<img width="1492" alt="spa-sqladmin-screenshot-2" src="./.github/images/screenshot-2.png">
+<img width="1492" alt="spa-sqladmin-screenshot-1" src="https://raw.githubusercontent.com/SenZmaKi/spa-sqladmin/main/.github/images/screenshot-1.png">
+<img width="1492" alt="spa-sqladmin-screenshot-2" src="https://raw.githubusercontent.com/SenZmaKi/spa-sqladmin/main/.github/images/screenshot-2.png">
 
 ## Quickstart
 
