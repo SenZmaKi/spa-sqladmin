@@ -149,7 +149,7 @@ class BaseView(BaseModelView):
 
         class CustomAdmin(BaseView):
             name = "Custom Page"
-            icon = "fa-solid fa-chart-line"
+            icon = "TrendingUp"
 
             @expose("/custom", methods=["GET"])
             async def test_page(self, request: Request):

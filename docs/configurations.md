@@ -180,9 +180,9 @@ The metadata for the model. The options are:
     class UserAdmin(ModelView, model=User):
         name = "User"
         name_plural = "Users"
-        icon = "fa-solid fa-user"
+        icon = "User"
         category = "accounts"
-        category_icon = "fa-solid fa-user"
+        category_icon = "Users"
     ```
 
 ## List page
@@ -312,7 +312,7 @@ class UserAdmin(ModelView, model=User):
     can_view_details = True
     name = "User"
     name_plural = "Users"
-    icon = "fa-solid fa-user"
+    icon = "User"
     identity = "user"
 ```
 

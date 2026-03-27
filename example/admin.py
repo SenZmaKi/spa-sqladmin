@@ -75,7 +75,7 @@ class UserAdmin(ModelView, model=User):
         User.created_at: "Joined",
         User.updated_at: "Last Updated",
     }
-    icon = "fa-solid fa-users"
+    icon = "Users"
 
     name = "User"
     name_plural = "Users"

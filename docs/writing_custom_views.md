@@ -12,7 +12,7 @@ To add custom views to the Admin interface, you can use the `BaseView` included 
 
     class ReportView(BaseView):
         name = "Report Page"
-        icon = "fa-solid fa-chart-line"
+        icon = "TrendingUp"
 
         @expose("/report", methods=["GET"])
         async def report_page(self, request):
@@ -73,7 +73,7 @@ The example above was very basic and you probably want to access database and SQ
 
     class ReportView(BaseView):
         name = "Report Page"
-        icon = "fa-solid fa-chart-line"
+        icon = "TrendingUp"
 
         @expose("/report", methods=["GET"])
         async def report_page(self, request):

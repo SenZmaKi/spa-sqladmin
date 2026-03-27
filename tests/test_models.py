@@ -123,9 +123,9 @@ def test_metadata_setup() -> None:
         pass
 
     class TempAdmin(ModelView, model=TempModel):
-        icon = "fa-solid fa-user"
+        icon = "User"
 
-    assert TempAdmin.icon == "fa-solid fa-user"
+    assert TempAdmin.icon == "User"
     assert TempAdmin.identity == "temp-model"
     assert TempAdmin.name == "Temp Model"
     assert TempAdmin.name_plural == "Temp Models"

@@ -171,48 +171,6 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-const FA_TO_LUCIDE: Record<string, LucideIcon> = {
-  'fa-solid fa-user': Users,
-  'fa-solid fa-users': Users,
-  'fa-solid fa-box': Package,
-  'fa-solid fa-boxes': Package,
-  'fa-solid fa-cog': Settings,
-  'fa-solid fa-gear': Settings,
-  'fa-solid fa-cogs': Settings,
-  'fa-solid fa-file': FileText,
-  'fa-solid fa-file-alt': FileText,
-  'fa-solid fa-file-text': FileText,
-  'fa-solid fa-shopping-cart': ShoppingCart,
-  'fa-solid fa-cart-shopping': ShoppingCart,
-  'fa-solid fa-tag': Tag,
-  'fa-solid fa-tags': Tag,
-  'fa-solid fa-envelope': Mail,
-  'fa-solid fa-globe': Globe,
-  'fa-solid fa-image': Image,
-  'fa-solid fa-images': Image,
-  'fa-solid fa-comment': MessageSquare,
-  'fa-solid fa-comments': MessageSquare,
-  'fa-solid fa-calendar': Calendar,
-  'fa-solid fa-database': Database,
-  'fa-solid fa-shield': Shield,
-  'fa-solid fa-shield-alt': Shield,
-  'fa-solid fa-star': Star,
-  'fa-solid fa-heart': Heart,
-  'fa-solid fa-book': BookOpen,
-  'fa-solid fa-folder': Folder,
-  'fa-solid fa-home': Home,
-  'fa-solid fa-house': Home,
-  'fa-solid fa-bell': Bell,
-  'fa-solid fa-map': Map,
-  'fa-solid fa-credit-card': CreditCard,
-  'fa-solid fa-truck': Truck,
-  'fa-solid fa-dashboard': LayoutDashboard,
-  'fa-solid fa-table-columns': LayoutDashboard,
-  'fa-solid fa-receipt': FileText,
-  'fa-solid fa-list': LayoutDashboard,
-  'fa-solid fa-user-group': Users,
-  'fa-solid fa-people-group': Users,
-}
 
 const LUCIDE_BY_NAME: Record<string, LucideIcon> = {
   // Original set
@@ -257,19 +215,12 @@ export type ResolvedIcon =
 export function resolveIcon(icon: string): ResolvedIcon {
   if (!icon) return { type: 'lucide', icon: LayoutDashboard }
   if (isSvgString(icon)) return { type: 'svg', svg: icon }
-  if (FA_TO_LUCIDE[icon]) return { type: 'lucide', icon: FA_TO_LUCIDE[icon] }
   if (LUCIDE_BY_NAME[icon]) return { type: 'lucide', icon: LUCIDE_BY_NAME[icon] }
   const lower = icon.toLowerCase()
   for (const [name, comp] of Object.entries(LUCIDE_BY_NAME)) {
     if (name.toLowerCase() === lower) return { type: 'lucide', icon: comp }
   }
   return { type: 'lucide', icon: LayoutDashboard }
-}
-
-/** @deprecated Use `resolveIcon` instead */
-export function mapFaToLucide(icon: string): LucideIcon {
-  const resolved = resolveIcon(icon)
-  return resolved.type === 'lucide' ? resolved.icon : LayoutDashboard
 }
 
 interface SidebarProps {
@@ -404,17 +355,19 @@ export function Sidebar({
           )}
           <Button
             variant="ghost"
-            size="icon"
-            className={cn('w-full', collapsed ? '' : 'justify-end')}
-            onClick={() => {
-              const next = !collapsed
-              onCollapsedChange(next)
-            }}
+            className={cn(
+              'w-full justify-start text-muted-foreground hover:text-foreground',
+              collapsed ? 'justify-center px-0' : ''
+            )}
+            onClick={() => onCollapsedChange(!collapsed)}
           >
             {collapsed ? (
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-4 w-4 shrink-0" />
             ) : (
-              <PanelLeftClose className="h-4 w-4" />
+              <>
+                <PanelLeftClose className="h-4 w-4 shrink-0" />
+                <span>Collapse</span>
+              </>
             )}
           </Button>
         </div>

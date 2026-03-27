@@ -62,19 +62,19 @@ Admin(
 
 ### Parameter reference
 
-| Parameter | Expected type | What it does |
-| --- | --- | --- |
-| `app` | `Starlette` or `FastAPI` app | Your ASGI application. The admin app is mounted into it. |
-| `engine` | `Engine` or `AsyncEngine` | SQLAlchemy engine used to build a session maker automatically. |
-| `session_maker` | `sessionmaker` or `async_sessionmaker` | Optional custom session factory. Use this when you need to control session creation yourself. |
-| `base_url` | `str` | Mount point for the admin UI and API. Defaults to `"/admin"`. |
-| `title` | `str` | Used for the browser title and the sidebar heading. |
-| `logo_url` | `str \| None` | Image URL shown in the sidebar alongside the title. Data URLs also work. |
-| `favicon_url` | `str \| None` | Browser-tab favicon URL. Data URLs also work. |
-| `color_palette` | `dict[str, dict[str, str]] \| None` | Optional theme token overrides for light and dark mode. |
-| `middlewares` | `Sequence[Middleware] \| None` | Extra Starlette middlewares added to the mounted admin app. |
-| `debug` | `bool` | Passed to the internal mounted Starlette app as its debug flag. |
-| `authentication_backend` | `AuthenticationBackend \| None` | Enables login/logout/auth checks for the admin. |
+| Parameter                | Expected type                          | What it does                                                                                  |
+| ------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `app`                    | `Starlette` or `FastAPI` app           | Your ASGI application. The admin app is mounted into it.                                      |
+| `engine`                 | `Engine` or `AsyncEngine`              | SQLAlchemy engine used to build a session maker automatically.                                |
+| `session_maker`          | `sessionmaker` or `async_sessionmaker` | Optional custom session factory. Use this when you need to control session creation yourself. |
+| `base_url`               | `str`                                  | Mount point for the admin UI and API. Defaults to `"/admin"`.                                 |
+| `title`                  | `str`                                  | Used for the browser title and the sidebar heading.                                           |
+| `logo_url`               | `str \| None`                          | Image URL shown in the sidebar alongside the title. Data URLs also work.                      |
+| `favicon_url`            | `str \| None`                          | Browser-tab favicon URL. Data URLs also work.                                                 |
+| `color_palette`          | `dict[str, dict[str, str]] \| None`    | Optional theme token overrides for light and dark mode.                                       |
+| `middlewares`            | `Sequence[Middleware] \| None`         | Extra Starlette middlewares added to the mounted admin app.                                   |
+| `debug`                  | `bool`                                 | Passed to the internal mounted Starlette app as its debug flag.                               |
+| `authentication_backend` | `AuthenticationBackend \| None`        | Enables login/logout/auth checks for the admin.                                               |
 
 ### `engine` vs `session_maker`
 
@@ -343,40 +343,16 @@ Rules:
 - it should be valid inline SVG markup
 - the frontend injects sizing classes when rendering it
 
-#### 3. Legacy FontAwesome strings
-
-There is backward-compatibility support for a limited set of FontAwesome class strings. These are translated to a semantically similar Lucide icon.
-
-Examples that work:
-
-- `fa-solid fa-user`
-- `fa-solid fa-users`
-- `fa-solid fa-box`
-- `fa-solid fa-shopping-cart`
-- `fa-solid fa-tag`
-- `fa-solid fa-envelope`
-- `fa-solid fa-calendar`
-- `fa-solid fa-database`
-- `fa-solid fa-shield`
-- `fa-solid fa-heart`
-- `fa-solid fa-home`
-- `fa-solid fa-credit-card`
-- `fa-solid fa-truck`
-- `fa-solid fa-dashboard`
-- `fa-solid fa-table-columns`
-- `fa-solid fa-user-group`
-
-Do not assume arbitrary FontAwesome names will work. Only the specific hardcoded mappings in the frontend are supported.
+#### 3. Legacy FontAwesome strings (removed)
 
 ### Icon fallback behavior
 
 The frontend resolves icons in this order:
 
-1. empty string -> `LayoutDashboard`
-2. inline SVG string -> render SVG
-3. known FontAwesome mapping -> mapped Lucide icon
-4. known Lucide name -> matching Lucide icon
-5. unknown value -> `LayoutDashboard`
+1. empty string → `LayoutDashboard`
+2. inline SVG string → render SVG
+3. known Lucide name (case-insensitive) → matching Lucide icon
+4. unknown value → `LayoutDashboard`
 
 If you want predictable results, prefer a supported Lucide name or an explicit SVG string.
 

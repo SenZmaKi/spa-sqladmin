@@ -3,13 +3,9 @@ import { Link } from '@tanstack/react-router'
 import { AppLayout } from '@/components/layout/app-layout'
 import { useSite } from '@/hooks/use-site'
 import { resolveIcon, SvgIcon } from '@/components/layout/sidebar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  List,
-  Plus,
   ChevronDown,
   ChevronRight,
   LayoutDashboard,
@@ -42,10 +38,8 @@ function DashboardSkeleton() {
         <Card key={i}>
           <CardHeader>
             <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-16 mt-1" />
           </CardHeader>
-          <CardContent>
-            <Skeleton className="h-8 w-full" />
-          </CardContent>
         </Card>
       ))}
     </div>
@@ -158,37 +152,24 @@ function ModelCard({
   const resolved = resolveIcon(model.icon)
 
   return (
-    <Card className="group hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            {resolved.type === 'lucide' ? (
-              <resolved.icon className="h-4 w-4" />
-            ) : (
-              <SvgIcon svg={resolved.svg} className="h-4 w-4" />
-            )}
-          </div>
-          <span>{model.name_plural}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex gap-2">
-        <Link
-          to={`/${model.identity}/list` as AnyLinkTo}
-          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'flex-1')}
-        >
-          <List className="h-3.5 w-3.5" />
-          View List
-        </Link>
-        {model.permissions.can_create && (
-          <Link
-            to={`/${model.identity}/create` as AnyLinkTo}
-            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'flex-1')}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Create
-          </Link>
-        )}
-      </CardContent>
-    </Card>
+    <Link
+      to={`/${model.identity}/list` as AnyLinkTo}
+      className="block group"
+    >
+      <Card className="h-full transition-all duration-200 hover:shadow-md hover:border-primary/40 cursor-pointer">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
+              {resolved.type === 'lucide' ? (
+                <resolved.icon className="h-4 w-4" />
+              ) : (
+                <SvgIcon svg={resolved.svg} className="h-4 w-4" />
+              )}
+            </div>
+            <span className="group-hover:text-primary transition-colors">{model.name_plural}</span>
+          </CardTitle>
+        </CardHeader>
+      </Card>
+    </Link>
   )
 }
