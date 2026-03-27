@@ -9,6 +9,7 @@ from models import Order, Product, User
 
 
 class UserAdmin(ModelView, model=User):
+    category = "Models"
     name = "User"
     name_plural = "Users"
     icon = "Users"
@@ -26,6 +27,7 @@ class UserAdmin(ModelView, model=User):
 
 
 class ProductAdmin(ModelView, model=Product):
+    category = "Models"
     name = "Product"
     name_plural = "Products"
     icon = "Package"
@@ -42,6 +44,7 @@ class ProductAdmin(ModelView, model=Product):
 
 
 class OrderAdmin(ModelView, model=Order):
+    category = "Models"
     name = "Order"
     name_plural = "Orders"
     icon = "ShoppingCart"

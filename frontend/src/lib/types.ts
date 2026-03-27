@@ -1,3 +1,8 @@
+export interface FontConfig {
+  url?: string
+  family?: string
+}
+
 export interface AdminConfig {
   baseUrl: string
   apiUrl: string
@@ -5,6 +10,7 @@ export interface AdminConfig {
   logoUrl?: string | null
   faviconUrl?: string | null
   colorPalette?: ColorPalette | null
+  fontConfig?: FontConfig | null
 }
 
 export interface ColorPalette {
@@ -44,6 +50,7 @@ export interface SiteData {
   logo_url: string | null
   favicon_url: string | null
   color_palette: ColorPalette | null
+  font_config: FontConfig | null
   base_url: string
   models: ModelInfo[]
   menu: MenuItem[]

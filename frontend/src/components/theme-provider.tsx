@@ -16,10 +16,31 @@ function clearPaletteVars(colors: Record<string, string>) {
   }
 }
 
+function applyFontConfig(fontConfig: { url?: string; family?: string } | null | undefined) {
+  if (!fontConfig) return
+  if (fontConfig.url) {
+    const existingLink = document.querySelector<HTMLLinkElement>('link[data-admin-font]')
+    if (!existingLink) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = fontConfig.url
+      link.setAttribute('data-admin-font', '')
+      document.head.appendChild(link)
+    }
+  }
+  if (fontConfig.family) {
+    document.documentElement.style.setProperty('--font-family', fontConfig.family)
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useUIStore((s) => s.theme)
-  // Read palette once from injected config (synchronous, no flash)
-  const palette = React.useMemo(() => getAdminConfig().colorPalette ?? null, [])
+  const config = React.useMemo(() => getAdminConfig(), [])
+  const palette = React.useMemo(() => config.colorPalette ?? null, [config])
+
+  React.useEffect(() => {
+    applyFontConfig(config.fontConfig)
+  }, [config.fontConfig])
 
   React.useEffect(() => {
     const root = document.documentElement

@@ -132,6 +132,30 @@ admin = Admin(
 )
 ```
 
+## Font Configuration
+
+Consumers can supply a `font_config` dict to load a custom web font for the
+admin UI. The dict accepts two keys:
+
+| Key      | Description                                                                   |
+|----------|-------------------------------------------------------------------------------|
+| `url`    | URL of a CSS stylesheet that declares the font (e.g. a Google Fonts link).    |
+| `family` | CSS `font-family` value applied to the entire admin interface.                |
+
+Only the keys you provide take effect — omitting `url` skips the stylesheet
+injection, and omitting `family` keeps the default system font stack.
+
+```python
+admin = Admin(
+    app,
+    engine,
+    font_config={
+        "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        "family": "'Inter', sans-serif",
+    },
+)
+```
+
 ## Dark / Light / System Mode
 
 The admin UI includes a theme switcher button in the top-right header

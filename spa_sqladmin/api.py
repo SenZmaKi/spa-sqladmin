@@ -178,6 +178,7 @@ async def api_site(admin: "Admin", request: Request) -> Response:
             "logo_url": admin.logo_url,
             "favicon_url": admin.favicon_url,
             "color_palette": admin.color_palette,
+            "font_config": admin.font_config,
             "base_url": admin.base_url,
             "models": models,
             "menu": menu,

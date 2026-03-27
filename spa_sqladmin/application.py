@@ -114,6 +114,7 @@ class BaseAdmin:
         logo_url: str | None = None,
         favicon_url: str | None = None,
         color_palette: dict[str, dict[str, str]] | None = None,
+        font_config: dict[str, str] | None = None,
         middlewares: Sequence[Middleware] | None = None,
         authentication_backend: AuthenticationBackend | None = None,
     ) -> None:
@@ -124,6 +125,7 @@ class BaseAdmin:
         self.logo_url = logo_url
         self.favicon_url = favicon_url
         self.color_palette = color_palette
+        self.font_config = font_config
 
         if session_maker:
             self.session_maker = session_maker
@@ -471,6 +473,7 @@ class Admin(BaseAdmin):
         logo_url: str | None = None,
         favicon_url: str | None = None,
         color_palette: dict[str, dict[str, str]] | None = None,
+        font_config: dict[str, str] | None = None,
         middlewares: Sequence[Middleware] | None = None,
         debug: bool = False,
         authentication_backend: AuthenticationBackend | None = None,
@@ -486,6 +489,8 @@ class Admin(BaseAdmin):
             title: Admin title.
             logo_url: URL of logo to be displayed instead of title.
             favicon_url: URL of favicon to be displayed.
+            font_config: Font configuration dict with ``url`` (Google Fonts or
+                other stylesheet URL) and ``family`` (CSS font-family value).
             embed_docs: When ``True``, embed ``/docs``, ``/redoc``, and
                 ``/openapi.json`` into the admin sidebar.  If an
                 ``authentication_backend`` is configured the endpoints are also
@@ -504,6 +509,7 @@ class Admin(BaseAdmin):
             logo_url=logo_url,
             favicon_url=favicon_url,
             color_palette=color_palette,
+            font_config=font_config,
             middlewares=middlewares,
             authentication_backend=authentication_backend,
         )
@@ -841,18 +847,46 @@ class Admin(BaseAdmin):
             "logoUrl": self.logo_url,
             "faviconUrl": self.favicon_url,
             "colorPalette": self.color_palette,
+            "fontConfig": self.font_config,
         }
         config_json = _json.dumps(config)
         config_script = f"<script>window.__ADMIN_CONFIG__={config_json}</script>"
+
+        # Blocking theme-init script: reads persisted theme from localStorage
+        # and applies the `dark` class + color palette vars synchronously
+        # before first paint, preventing the white-flash FOUC.
+        theme_init_script = (
+            "<script>"
+            "(function(){"
+            "try{"
+            "var s=JSON.parse(localStorage.getItem('spa-sqladmin-ui')||'{}');"
+            "var t=(s.state&&s.state.theme)||'system';"
+            "var dark=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);"
+            "if(dark)document.documentElement.classList.add('dark');"
+            "var c=window.__ADMIN_CONFIG__;"
+            "if(c&&c.colorPalette){"
+            "var p=dark?c.colorPalette.dark:c.colorPalette.light;"
+            "if(p){var r=document.documentElement;for(var k in p)r.style.setProperty('--'+k,p[k])}"
+            "}"
+            "if(c&&c.fontConfig&&c.fontConfig.family)"
+            "document.documentElement.style.setProperty('--font-family',c.fontConfig.family);"
+            "}catch(e){}"
+            "})()"
+            "</script>"
+        )
         # Set the HTML <title> tag
         html = html.replace("<title>Admin</title>", f"<title>{self.title}</title>", 1)
         # Inject favicon link if provided
         favicon_html = ""
         if self.favicon_url:
             favicon_html = f'\n<link rel="icon" href="{self.favicon_url}">'
+        # Inject font stylesheet link if provided
+        font_html = ""
+        if self.font_config and self.font_config.get("url"):
+            font_html = f'\n<link rel="stylesheet" href="{self.font_config["url"]}">'
         html = html.replace(
             "<head>",
-            f'<head>\n<base href="{base_href}">\n{config_script}{favicon_html}',
+            f'<head>\n<base href="{base_href}">\n{config_script}\n{theme_init_script}{favicon_html}{font_html}',
             1,
         )
         self._spa_index_cache = html

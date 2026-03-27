@@ -20,12 +20,18 @@ type AnyLinkTo = any
 function getItemHref(item: MenuItem, baseUrl: string): string {
   if (item.is_model) return `/${item.identity}/list`
   if (item.is_link && item.url) return item.url   // DirectLinkMenu (embed_docs)
-  return `${baseUrl}/${item.identity}`             // LinkView with get_response
+  if (item.is_link) return `${baseUrl}/${item.identity}` // LinkView with get_response
+  return `${baseUrl}/${item.identity}`
 }
 
 /** True when the href is an external / absolute URL. */
 function isExternal(href: string): boolean {
   return href.startsWith('http://') || href.startsWith('https://')
+}
+
+/** True when the item links outside the SPA router (link views, external). */
+function isNonRouterLink(item: MenuItem): boolean {
+  return !!item.is_link
 }
 
 export function DashboardPage() {
@@ -196,6 +202,16 @@ function ViewCard({
   if (external) {
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className="block group">
+        {cardContent}
+      </a>
+    )
+  }
+
+  // Link views live outside the SPA router — use a plain <a> so the basepath
+  // isn't prepended (e.g. /docs stays /docs, not /admin/docs).
+  if (isNonRouterLink(item)) {
+    return (
+      <a href={href} className="block group">
         {cardContent}
       </a>
     )
