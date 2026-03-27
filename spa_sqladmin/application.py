@@ -934,7 +934,7 @@ def action(
     add_in_detail: bool = True,
     add_in_list: bool = True,
 ) -> Callable[..., Any]:
-    """Decorate a [`ModelView`][sqladmin.models.ModelView] function
+    """Decorate a [`ModelView`][spa_sqladmin.models.ModelView] function
     with this to:
 
     * expose it as a custom "action" route

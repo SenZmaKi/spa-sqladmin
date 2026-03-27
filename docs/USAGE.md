@@ -6,8 +6,8 @@ This guide focuses on the parts of `spa-sqladmin` you usually configure first:
 - accepted value types and expected syntax
 - branding and theme options
 - supported sidebar icon formats
-- how to configure a `ModelView` for a resource
-- how to add custom admin pages with `BaseView`
+- how to configure a `ModelView` for a resource (including enums, relationships, and formatters)
+- how to add custom admin pages and stats endpoints with `BaseView` and `LinkView`
 
 For generated API docs, also see the [Application API reference](api_reference/application.md), [ModelView API reference](api_reference/model_view.md), and [BaseView API reference](api_reference/base_view.md).
 
@@ -386,6 +386,44 @@ class StoreStats(LinkView):
 admin.add_view(StoreStats)
 ```
 
+You can also query the database directly inside `get_response`. Use your own
+`sessionmaker` (the same one you pass to `Admin`) and run any SQLAlchemy query:
+
+```python
+from sqlalchemy import func, select
+from sqlalchemy.orm import sessionmaker
+from spa_sqladmin import LinkView
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from db import SessionLocal  # your sessionmaker
+from models import Order, Product, User
+
+
+class StatsView(LinkView):
+    name = "Stats"
+    icon = "BarChart2"
+    category = "Internal"
+    category_icon = "Lock"
+
+    async def get_response(self, request: Request) -> JSONResponse:
+        with SessionLocal() as session:
+            users = session.execute(select(func.count()).select_from(User)).scalar()
+            products = session.execute(select(func.count()).select_from(Product)).scalar()
+            orders = session.execute(select(func.count()).select_from(Order)).scalar()
+            revenue = session.execute(select(func.sum(Order.total))).scalar() or 0.0
+        return JSONResponse(
+            {
+                "users": users,
+                "products": products,
+                "orders": orders,
+                "total_revenue": round(float(revenue), 2),
+            }
+        )
+
+admin.add_view(StatsView)
+```
+
 ### External redirect (`url`)
 
 Set `url` without overriding `get_response` to create an auth-gated redirect.
@@ -421,6 +459,28 @@ FastAPI's own `get_swagger_ui_html` / `get_redoc_html` / `app.openapi()`.
 
 Without an `authentication_backend`, the sidebar entries are added as plain
 links and the original FastAPI doc routes are left untouched.
+
+A complete setup using `SimpleAuthBackend` and `embed_docs` together:
+
+```python
+from fastapi import FastAPI
+from spa_sqladmin import Admin, SimpleAuthBackend
+
+app = FastAPI(title="My App")
+
+auth = SimpleAuthBackend(
+    secret_key="change-me-in-production",
+    credentials={"admin": "password"},
+)
+
+admin = Admin(
+    app,
+    engine,
+    title="My Admin",
+    authentication_backend=auth,
+    embed_docs=True,
+)
+```
 
 ### `LinkView` attributes
 
@@ -471,6 +531,72 @@ class UserAdmin(ModelView, model=User):
 
 admin.add_view(UserAdmin)
 ```
+
+### Displaying relationship columns
+
+You can include a relationship attribute directly in `column_list` or `column_details_list`.
+spa-sqladmin will call `str()` on the related object, so make sure your model defines `__str__`.
+
+```python
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True)
+    status = Column(Enum(OrderStatus))
+    total = Column(Float)
+    user = relationship("User", back_populates="orders")
+
+    def __str__(self) -> str:
+        return f"Order #{self.id}"
+
+
+class OrderAdmin(ModelView, model=Order):
+    column_list = [Order.id, Order.status, Order.total, Order.user, Order.created_at]
+    column_sortable_list = [Order.id, Order.total, Order.created_at]
+    form_excluded_columns = [Order.created_at]
+```
+
+`Order.user` in `column_list` will render each row's user as its `__str__` value.
+
+### Enum columns
+
+SQLAlchemy `Enum` columns are supported out of the box. Values are shown and edited
+using a select widget populated with the enum members.
+
+```python
+import enum
+from sqlalchemy import Column, Enum
+
+class Role(str, enum.Enum):
+    ADMIN = "admin"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    role = Column(Enum(Role), default=Role.VIEWER, nullable=False)
+
+
+class UserAdmin(ModelView, model=User):
+    column_list = [User.id, User.role]
+```
+
+### Column formatters
+
+`column_formatters` lets you customize how a value is rendered in the list page.
+Each value is a callable that receives `(model_instance, attribute_name)` and returns
+a string (or any JSON-serialisable value).
+
+```python
+class ProductAdmin(ModelView, model=Product):
+    column_list = [Product.id, Product.name, Product.price, Product.is_active]
+    column_formatters = {
+        Product.price: lambda m, a: f"${m.price:,.2f}",
+        Product.is_active: lambda m, a: "✓" if m.is_active else "✗",
+    }
+```
+
 
 ### Important `ModelView` behaviors
 
@@ -627,7 +753,7 @@ If your project uses synchronous sessions, use the equivalent sync session patte
 
 ## Practical recommendations
 
-- Prefer Lucide icon names over FontAwesome strings.
+- Prefer Lucide icon names over inline SVG strings for simplicity.
 - Use inline SVG strings when you need a brand-specific or custom icon.
 - Keep `color_palette` values in Tailwind-style HSL tokens.
 - Use `ModelView` for model resources and `BaseView` for custom pages.
@@ -636,15 +762,30 @@ If your project uses synchronous sessions, use the equivalent sync session patte
 
 ## Complete example
 
-The repository's `example/` app demonstrates:
+The repository's `example/` directory contains a fully-wired FastAPI app
+that demonstrates:
 
-- custom `title`
-- SVG data URL `logo_url`
-- SVG data URL `favicon_url`
-- light and dark `color_palette`
-- Lucide icons
-- legacy FontAwesome icon strings
-- raw SVG sidebar icons
-- multiple `ModelView` resources
+- `SimpleAuthBackend` with `credentials` and `embed_docs`
+- `title` customization
+- Multiple `ModelView` resources with icons, categories, search, sort, and `form_excluded_columns`
+- Enum columns (displayed as readable enum values)
+- Relationship columns displayed directly in `column_list` (e.g. `Order.user`)
+- A `LinkView` subclass (`StatsView`) that queries the database and returns JSON
 
-If you want a working reference, start there after reading this guide.
+To run the example:
+
+```shell
+cd example
+uv run uvicorn app:app --port 8091 --reload
+# or: pip install -e .. && uvicorn app:app --port 8091 --reload
+```
+
+Then visit:
+
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8091/admin` | Admin UI (redirects to login) |
+| `http://localhost:8091/admin/login` | Login — use `admin` / `password` |
+| `http://localhost:8091/docs` | Swagger UI (auth-gated via `embed_docs=True`) |
+
+Start there for a working reference after reading this guide.

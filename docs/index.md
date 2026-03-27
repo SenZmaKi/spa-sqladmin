@@ -1,6 +1,6 @@
 <p align="center">
 <a href="https://github.com/senzmaki/spa-sqladmin">
-    <img width="400px" src="https://raw.githubusercontent.com/senzmaki/spa-sqladmin/main/docs/assets/images/banner.png" alt"SQLAdmin">
+    <img width="400px" src="https://raw.githubusercontent.com/senzmaki/spa-sqladmin/main/docs/assets/images/banner.png" alt="spa-sqladmin">
 </a>
 </p>
 
@@ -39,11 +39,9 @@ Main features include:
 
 ---
 
-**Documentation**: [https://aminalaee.github.io/sqladmin](https://aminalaee.github.io/sqladmin)
+**Documentation**: [https://senzmaki.github.io/spa-sqladmin](https://senzmaki.github.io/spa-sqladmin)
 
-**Source Code**: [https://github.com/senzmaki/spa-sqladmin](https://github.com/senzmaki/spa-sqladmin)
-
-**Online Demo**: [Demo](https://sqladmin-demo.aminalaee.dev/admin/)
+**Source Code**: [https://github.com/SenZmaKi/spa-sqladmin](https://github.com/SenZmaKi/spa-sqladmin)
 
 ---
 
@@ -59,8 +57,8 @@ $ pip install "spa-sqladmin[full] @ git+https://github.com/SenZmaKi/spa-sqladmin
 
 ## Screenshots
 
-<img width="1492" alt="sqladmin-1" src="https://user-images.githubusercontent.com/19784933/208232730-0114a155-2740-4e89-9d73-64a4e51a5cf5.png">
-<img width="1492" alt="sqladmin-2" src="https://user-images.githubusercontent.com/19784933/208232731-6d783dde-b93e-41c0-911b-3d1c3c73f1d5.png">
+<img width="1492" alt="spa-sqladmin-screenshot-1" src="assets/images/screenshot-1.png">
+<img width="1492" alt="spa-sqladmin-screenshot-2" src="assets/images/screenshot-2.png">
 
 ## Quickstart
 
@@ -88,7 +86,7 @@ class User(Base):
 Base.metadata.create_all(engine)  # Create tables
 ```
 
-If you want to use `SQLAdmin` with `FastAPI`:
+If you want to use `spa-sqladmin` with `FastAPI`:
 
 ```python
 from fastapi import FastAPI
@@ -106,7 +104,7 @@ class UserAdmin(ModelView, model=User):
 admin.add_view(UserAdmin)
 ```
 
-Or if you want to use `SQLAdmin` with `Starlette`:
+Or if you want to use `spa-sqladmin` with `Starlette`:
 
 ```python
 from spa_sqladmin import Admin, ModelView
@@ -124,12 +122,12 @@ class UserAdmin(ModelView, model=User):
 admin.add_view(UserAdmin)
 ```
 
-Now visiting `/admin` on your browser you can see the `SQLAdmin` interface.
+Now visiting `/admin` on your browser you can see the `spa-sqladmin` interface.
 
 For a full overview of `Admin(...)` parameters, icon formats, palette syntax, and custom admin patterns, see the [Usage Guide](USAGE.md).
 
 ## Related projects and inspirations
 
-* [Flask-Admin](https://github.com/flask-admin/flask-admin) Admin interface for Flask supporting different database backends and ORMs. This project has inspired SQLAdmin extensively and most of the features and configurations are implemented the same.
+* [Flask-Admin](https://github.com/flask-admin/flask-admin) Admin interface for Flask supporting different database backends and ORMs. This project has inspired spa-sqladmin extensively and most of the features and configurations are implemented the same.
 * [FastAPI-Admin](https://github.com/fastapi-admin/fastapi-admin) Admin interface for FastAPI which works with `TortoiseORM`.
 * [Dashboard](https://github.com/encode/dashboard) Admin interface for ASGI frameworks which works with the `orm` package.

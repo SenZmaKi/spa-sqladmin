@@ -1,9 +1,39 @@
-SQLadmin does not enforce any authentication to your application,
+spa-sqladmin does not enforce any authentication to your application,
 but provides an optional `AuthenticationBackend` you can use.
+
+## SimpleAuthBackend
+
+For quick setups, spa-sqladmin ships a ready-to-use `SimpleAuthBackend` that stores
+credentials in memory. It requires no database and is the fastest way to add
+username/password protection to your admin.
+
+```python
+from spa_sqladmin import Admin, SimpleAuthBackend
+
+auth = SimpleAuthBackend(
+    secret_key="change-me-in-production",
+    credentials={"admin": "password", "ops": "secret"},
+    login_rate_limit="5/minute",   # optional, default is 60/minute
+    session_max_age=3600,          # optional, seconds
+    https_only=False,              # set True in production behind HTTPS
+)
+
+admin = Admin(app, engine, authentication_backend=auth)
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `secret_key` | required | Used to sign session cookies. Change for every deployment. |
+| `credentials` | required | `dict` of `username → password` pairs. |
+| `login_rate_limit` | `"60/minute"` | Throttles login attempts. |
+| `session_max_age` | `3600` | Session lifetime in seconds. |
+| `https_only` | `False` | Enforce secure cookie flag (use in production). |
+
+---
 
 ## AuthenticationBackend
 
-SQLAdmin has a session-based authentication that will allow you
+    spa-sqladmin has a session-based authentication that will allow you
 to integrate any existing authentication to it.
 
 The class `AuthenticationBackend` has three methods you need to override:
@@ -46,7 +76,7 @@ class AdminAuth(AuthenticationBackend):
 
 
 authentication_backend = AdminAuth(secret_key="...")
-admin = Admin(app=..., authentication_backend=authentication_backend، ...)
+admin = Admin(app=..., authentication_backend=authentication_backend, ...)
 ```
 
 !!! note
@@ -118,7 +148,7 @@ admin = Admin(app=..., authentication_backend=authentication_backend، ...)
 
 ## Using OAuth
 
-You can also integrate OAuth into SQLAdmin, for this example we will integrate Google OAuth using `Authlib`.
+You can also integrate OAuth into spa-sqladmin, for this example we will integrate Google OAuth using `Authlib`.
 If you have followed the previous example, there are only two changes required to the authentication flow:
 
 ```python
@@ -182,7 +212,7 @@ admin.app.router.add_route("/auth/google", login_google)
 
 ## Permissions
 
-The `ModelView` and `BaseView` classes in SQLAdmin implements two special methods you can override.
+The `ModelView` and `BaseView` classes in spa-sqladmin implement two special methods you can override.
 You can use these methods to have control over each Model/View in addition to the AuthenticationBackend.
 So this is more like checking if the user has access to the specific Model or View.
 

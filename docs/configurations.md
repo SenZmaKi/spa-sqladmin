@@ -1,4 +1,4 @@
-SQLAdmin configuration options are heavily inspired by the Flask-Admin project.
+spa-sqladmin configuration options are heavily inspired by the Flask-Admin project.
 
 This page will give you a basic introduction and for all the details
 you can visit [API Reference](./api_reference/model_view.md).
@@ -41,7 +41,7 @@ class Address(Base):
 Base.metadata.create_all(engine)  # Create tables
 ```
 
-If you want to integrate SQLAdmin into FastAPI application:
+If you want to integrate spa-sqladmin into FastAPI application:
 
 ```python
 from fastapi import FastAPI
@@ -148,10 +148,10 @@ As you can see the `UserAdmin` class inherits from `ModelView` and accepts some 
 You can configure a few general permissions for this model.
 The following options are available:
 
-- `can_create`: If the model can create new instances via SQLAdmin. Default value is `True`.
-- `can_edit`: If the model instances can be edited via SQLAdmin. Default value is `True`.
-- `can_delete`: If the model instances can be deleted via SQLAdmin. Default value is `True`.
-- `can_view_details`: If the model instance details can be viewed via SQLAdmin. Default value is `True`.
+- `can_create`: If the model can create new instances via spa-sqladmin. Default value is `True`.
+- `can_edit`: If the model instances can be edited via spa-sqladmin. Default value is `True`.
+- `can_delete`: If the model instances can be deleted via spa-sqladmin. Default value is `True`.
+- `can_view_details`: If the model instance details can be viewed via spa-sqladmin. Default value is `True`.
 - `can_export`: If the model data can be exported in the list page. Default value is `True`.
 
 !!! example
@@ -170,7 +170,7 @@ The metadata for the model. The options are:
 
 - `name`: Display name for this model. Default value is the class name.
 - `name_plural`: Display plural name for this model. Default value is class name + `s`.
-- `icon`: Icon to be displayed for this model in the admin. Only FontAwesome and Tabler names are supported.
+- `icon`: Icon to be displayed for this model in the admin. Accepts a [Lucide](https://lucide.dev/) icon name (case-insensitive) or an inline SVG string. Unknown names fall back to `LayoutDashboard`.
 - `category`: Category name to display group of `ModelView` classes together in dropdown.
 - `category_icon`: Category icon to display.
 
@@ -398,7 +398,7 @@ There are a few options which apply to both List and Detail pages. They include:
 
 ## Form options
 
-SQLAdmin allows customizing how forms work with your models.
+spa-sqladmin allows customizing how forms work with your models.
 The forms are based on `WTForms` package and include the following options:
 
 - `form`: Default form to be used for creating or editing the model. Default value is `None` and form is created dynamically.
@@ -441,7 +441,7 @@ To define how related model is displayed in the dropdown, `__str__` method must 
 
 ## Export options
 
-SQLAdmin supports exporting data in the list page. Currently only CSV export is supported.
+spa-sqladmin supports exporting data in the list page. Both CSV and JSON export formats are supported.
 The export options can be set per model and includes the following options:
 
 - `can_export`: If the model can be exported. Default value is `True`.
