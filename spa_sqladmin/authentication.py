@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import functools
+import hmac
 import inspect
+import secrets
 from typing import Any, Callable
 
 from starlette.middleware import Middleware
@@ -20,15 +22,29 @@ class SimpleAuthBackend:
         auth = SimpleAuthBackend(
             secret_key="change-me",
             credentials={"admin": "secret", "ops": "s3cur3"},
+            login_rate_limit="5/minute",
         )
         Admin(app, engine, authentication_backend=auth)
     """
 
-    def __init__(self, secret_key: str, credentials: dict) -> None:
+    def __init__(
+        self,
+        secret_key: str,
+        credentials: dict,
+        login_rate_limit: str = "60/minute",
+        session_max_age: int = 3600,
+        https_only: bool = False,
+    ) -> None:
         from starlette.middleware.sessions import SessionMiddleware
 
+        self.login_rate_limit = login_rate_limit
         self.middlewares = [
-            Middleware(SessionMiddleware, secret_key=secret_key),
+            Middleware(
+                SessionMiddleware,
+                secret_key=secret_key,
+                max_age=session_max_age,
+                https_only=https_only,
+            ),
         ]
         self._credentials: dict[str, str] = {
             str(k): str(v) for k, v in credentials.items()
@@ -38,8 +54,14 @@ class SimpleAuthBackend:
         form = await request.form()
         username = str(form.get("username", ""))
         password = str(form.get("password", ""))
-        if self._credentials.get(username) == password:
-            request.session.update({"token": username})
+        stored = self._credentials.get(username, "")
+        # Always compare (even for unknown users) to mitigate timing attacks.
+        # `and stored` prevents empty-string false-positive on unknown usernames.
+        if hmac.compare_digest(stored, password) and stored:
+            # Clear existing session to prevent session fixation, then store
+            # a random token so the authenticated value is unguessable.
+            request.session.clear()
+            request.session["token"] = secrets.token_hex(32)
             return True
         return False
 
@@ -57,11 +79,21 @@ class AuthenticationBackend:
     `login`, `logout` and `authenticate`.
     """
 
-    def __init__(self, secret_key: str) -> None:
+    def __init__(
+        self,
+        secret_key: str,
+        session_max_age: int = 3600,
+        https_only: bool = False,
+    ) -> None:
         from starlette.middleware.sessions import SessionMiddleware
 
         self.middlewares = [
-            Middleware(SessionMiddleware, secret_key=secret_key),
+            Middleware(
+                SessionMiddleware,
+                secret_key=secret_key,
+                max_age=session_max_age,
+                https_only=https_only,
+            ),
         ]
 
     async def login(self, request: Request) -> bool:
@@ -120,7 +152,8 @@ def login_required(func: Callable[..., Any]) -> Callable[..., Any]:
 class PathProtectionMiddleware:
     """ASGI middleware that gates a set of URL paths behind admin authentication.
 
-    Added to the **parent** app by :meth:`~spa_sqladmin.application.BaseAdmin.protect_paths`
+    Added to the **parent** app by
+    :meth:`~spa_sqladmin.application.BaseAdmin.protect_paths`
     so that direct navigation to protected paths (e.g. ``/docs``, ``/redoc``) is subject
     to the same session check as the admin UI itself.
 

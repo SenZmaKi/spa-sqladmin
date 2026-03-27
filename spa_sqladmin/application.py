@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import io
 import logging
+import types as _builtin_types
 from pathlib import Path
 from types import MethodType
 from typing import (
@@ -24,8 +25,6 @@ from starlette.datastructures import FormData, UploadFile
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.requests import Request
-import types as _builtin_types
-
 from starlette.responses import (
     JSONResponse,
     RedirectResponse,
@@ -72,14 +71,19 @@ from spa_sqladmin.api import (
 from spa_sqladmin.api import (
     api_site as _api_site,
 )
-from spa_sqladmin.authentication import AuthenticationBackend, PathProtectionMiddleware, login_required
+from spa_sqladmin.authentication import (
+    AuthenticationBackend,
+    PathProtectionMiddleware,
+    login_required,
+)
 from spa_sqladmin.forms import WTFORMS_ATTRS, WTFORMS_ATTRS_REVERSED
 from spa_sqladmin.helpers import (
     is_async_session_maker,
+    prettify_class_name,
     slugify_action_name,
+    slugify_class_name,
 )
 from spa_sqladmin.models import BaseView, LinkView, ModelView
-from spa_sqladmin.helpers import prettify_class_name, slugify_class_name
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker  # type: ignore[attr-defined]
@@ -521,6 +525,33 @@ class Admin(BaseAdmin):
         self._admin_ui_dir = Path(__file__).parent / "statics" / "admin-ui"
         self._spa_index_cache: str | None = None
 
+        if authentication_backend is None:
+            logger.warning(
+                "spa-sqladmin: No authentication_backend configured — "
+                "all admin routes are publicly accessible. "
+                "Pass authentication_backend= to restrict access."
+            )
+
+        # Rate-limit the login endpoint via slowapi (IP + User-Agent key so
+        # clients behind the same NAT/router are not conflated).
+        login_endpoint: Any = self._api_login
+        _rate_limit = getattr(authentication_backend, "login_rate_limit", None)
+        if _rate_limit:
+            from slowapi import Limiter
+            from slowapi.middleware import SlowAPIMiddleware
+            from slowapi.util import get_remote_address
+
+            def _ip_ua_key(request: Request) -> str:
+                ip = get_remote_address(request)
+                ua = request.headers.get("user-agent", "")
+                return f"{ip}:{ua}"
+
+            _limiter = Limiter(key_func=_ip_ua_key)
+            self.admin.state.limiter = _limiter
+            self.admin.add_middleware(SlowAPIMiddleware)
+            login_endpoint = _limiter.limit(_rate_limit)(login_endpoint)
+            logger.debug("spa-sqladmin: login rate limit set to %s", _rate_limit)
+
         routes = [
             Mount("/statics", app=statics, name="statics"),
             # API routes
@@ -532,7 +563,7 @@ class Admin(BaseAdmin):
             ),
             Route(
                 "/api/login",
-                endpoint=self._api_login,
+                endpoint=login_endpoint,
                 name="api:login",
                 methods=["POST"],
             ),
