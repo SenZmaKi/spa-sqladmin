@@ -16,7 +16,7 @@ from starlette.datastructures import FormData, UploadFile
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from spa_sqladmin._menu import CategoryMenu, ViewMenu
+from spa_sqladmin._menu import CategoryMenu, DirectLinkMenu, ViewMenu
 from spa_sqladmin.filters import OperationColumnFilter
 from spa_sqladmin.helpers import get_object_identifier, slugify_class_name
 from spa_sqladmin.models import ModelView
@@ -207,13 +207,28 @@ def _serialize_menu_item(item: Any, request: Request) -> dict:
             "icon": item.icon or "",
             "children": children,
         }
+    if isinstance(item, DirectLinkMenu):
+        return {
+            "type": "item",
+            "name": item.display_name,
+            "icon": item.icon or "",
+            "identity": item.identity,
+            "is_model": False,
+            "is_link": True,
+            "url": item.direct_url,
+        }
     if isinstance(item, ViewMenu):
+        is_link = getattr(item.view, "is_link", False)
         return {
             "type": "item",
             "name": item.display_name,
             "icon": item.icon or "",
             "identity": getattr(item.view, "identity", ""),
             "is_model": getattr(item.view, "is_model", False),
+            "is_link": is_link,
+            # LinkView routes live inside the admin sub-app at /{identity}.
+            # The sidebar derives the href from identity, not url.
+            "url": "",
         }
     return {}
 

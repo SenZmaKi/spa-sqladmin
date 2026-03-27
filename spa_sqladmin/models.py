@@ -32,7 +32,7 @@ from sqlalchemy.sql.expression import Select, select
 from starlette.datastructures import URL
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import StreamingResponse
+from starlette.responses import RedirectResponse, Response, StreamingResponse
 from wtforms import Field, Form
 from wtforms.fields.core import UnboundField
 
@@ -69,7 +69,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "BaseView",
-    "ModelView",
+    "LinkView",
     "ModelView",
 ]
 
@@ -180,8 +180,9 @@ class BaseView(BaseModelView):
     """
 
     icon: ClassVar[str] = ""
-    """Display icon for ModelAdmin in the sidebar.
-    Currently only supports FontAwesome and Tabler icons.
+    """Display icon for the view in the sidebar.
+    Accepts a Lucide icon name (e.g. ``"Users"``, ``"TrendingUp"``)
+    or an inline SVG string (must start with ``<svg``).
     """
 
     category: ClassVar[str] = ""
@@ -189,6 +190,68 @@ class BaseView(BaseModelView):
 
     category_icon: ClassVar[str] = ""
     """Display icon for category in the sidebar."""
+
+
+class LinkView(BaseView):
+    """A sidebar entry backed by a custom response or an external redirect,
+    gated behind admin authentication.
+
+    The admin registers a protected route at ``/{identity}`` on the admin
+    sub-app.  Override :meth:`get_response` to serve your own content; set
+    :attr:`url` to redirect to an external URL instead.
+
+    ???+ usage
+        ```python
+        from spa_sqladmin import LinkView
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
+
+        class StoreStats(LinkView):
+            name = "Stats"
+            icon = "BarChart2"
+
+            async def get_response(self, request: Request):
+                return JSONResponse({"status": "ok"})
+
+        admin.add_view(StoreStats)
+        ```
+
+    For a simple external redirect, just set :attr:`url` without overriding
+    :meth:`get_response`::
+
+        class AnalyticsLink(LinkView):
+            name = "Analytics"
+            icon = "BarChart"
+            url = "https://analytics.example.com"
+    """
+
+    is_link: ClassVar[bool] = True
+
+    url: ClassVar[str] = ""
+    """External URL to redirect to when :meth:`get_response` is not overridden."""
+
+    async def get_response(self, request: Request) -> Response:
+        """Generate the HTTP response for this view.
+
+        Override this method to serve custom content (HTML, JSON, etc.).
+        The default implementation redirects to :attr:`url`.
+
+        Args:
+            request: The incoming Starlette request.
+
+        Returns:
+            Any :class:`starlette.responses.Response` subclass.
+
+        Raises:
+            NotImplementedError: If neither this method is overridden nor
+                :attr:`url` is set.
+        """
+        if not self.url:
+            raise NotImplementedError(
+                f"{type(self).__name__}.get_response() must be overridden "
+                "when no url is set."
+            )
+        return RedirectResponse(url=self.url, status_code=302)
 
 
 class ModelView(BaseView, metaclass=ModelViewMeta):

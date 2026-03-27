@@ -115,3 +115,44 @@ def login_required(func: Callable[..., Any]) -> Callable[..., Any]:
         return func(*args, **kwargs)
 
     return wrapper_decorator
+
+
+class PathProtectionMiddleware:
+    """ASGI middleware that gates a set of URL paths behind admin authentication.
+
+    Added to the **parent** app by :meth:`~spa_sqladmin.application.BaseAdmin.protect_paths`
+    so that direct navigation to protected paths (e.g. ``/docs``, ``/redoc``) is subject
+    to the same session check as the admin UI itself.
+
+    The ``protected_paths`` argument is a *mutable* :class:`set` shared with the
+    admin instance, so paths registered after the middleware is created are
+    automatically picked up without rebuilding the middleware stack.
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        protected_paths: set[str],
+        admin_login_url: str,
+        auth_backend: "AuthenticationBackend",
+    ) -> None:
+        self.app = app
+        self.protected_paths = protected_paths
+        self.admin_login_url = admin_login_url
+        self.auth_backend = auth_backend
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            request = Request(scope, receive)
+            if request.url.path in self.protected_paths:
+                result = await self.auth_backend.authenticate(request)
+                if isinstance(result, Response):
+                    await result(scope, receive, send)
+                    return
+                if not bool(result):
+                    response = RedirectResponse(
+                        url=self.admin_login_url, status_code=302
+                    )
+                    await response(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)

@@ -34,6 +34,8 @@ export interface MenuItem {
   icon: string
   identity?: string
   is_model?: boolean
+  is_link?: boolean
+  url?: string
   children?: MenuItem[]
 }
 

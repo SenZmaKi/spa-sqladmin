@@ -445,7 +445,11 @@ function SidebarMenuItem({
     )
   }
 
+  const isLinkItem = item.is_link && item.identity
   const href = item.identity ? `/${item.identity}/list` : '/'
+  // Use item.url directly when provided (e.g. embed_docs entries served at their own path);
+  // fall back to the admin redirect route.
+  const linkHref = isLinkItem ? (item.url || `${baseUrl}/${item.identity}`) : ''
   const identityPrefix = item.identity ? `${baseUrl}/${item.identity}` : null
   const isActive =
     identityPrefix
@@ -453,25 +457,42 @@ function SidebarMenuItem({
         currentPath.startsWith(`${identityPrefix}/`)
       : currentPath === baseUrl || currentPath === `${baseUrl}/`
 
+  const itemClassName = cn(
+    'flex items-center gap-3 rounded-md mx-2 px-3 py-2 text-sm font-medium transition-colors',
+    isActive
+      ? 'bg-primary/10 text-primary'
+      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+    collapsed ? 'justify-center px-2' : '',
+    depth > 0 && !collapsed ? 'ml-4' : ''
+  )
+
+  const iconNode = resolved.type === 'lucide' ? (
+    <resolved.icon className="h-4 w-4 shrink-0" />
+  ) : (
+    <SvgIcon svg={resolved.svg} className="h-4 w-4 shrink-0" />
+  )
+
+  if (isLinkItem) {
+    return (
+      <a
+        href={linkHref}
+        className={itemClassName}
+        title={collapsed ? item.name : undefined}
+      >
+        {iconNode}
+        {!collapsed && <span className="truncate">{item.name}</span>}
+      </a>
+    )
+  }
+
   return (
     <Link
       to={href as AnyLinkTo}
       onClick={onNavigate}
-      className={cn(
-        'flex items-center gap-3 rounded-md mx-2 px-3 py-2 text-sm font-medium transition-colors',
-        isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-        collapsed ? 'justify-center px-2' : '',
-        depth > 0 && !collapsed ? 'ml-4' : ''
-      )}
+      className={itemClassName}
       title={collapsed ? item.name : undefined}
     >
-      {resolved.type === 'lucide' ? (
-        <resolved.icon className="h-4 w-4 shrink-0" />
-      ) : (
-        <SvgIcon svg={resolved.svg} className="h-4 w-4 shrink-0" />
-      )}
+      {iconNode}
       {!collapsed && <span className="truncate">{item.name}</span>}
     </Link>
   )

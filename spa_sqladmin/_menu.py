@@ -85,6 +85,19 @@ class ViewMenu(ItemMenu):
         return "View"
 
 
+class DirectLinkMenu(ItemMenu):
+    """A menu item that points directly to a URL with no backing view or admin route.
+
+    Used internally by :meth:`~spa_sqladmin.application.Admin._setup_docs_protection`
+    to add API-docs entries to the sidebar without creating redirect routes.
+    """
+
+    def __init__(self, name: str, icon: str, url: str, identity: str) -> None:
+        super().__init__(name=name, icon=icon)
+        self.direct_url = url
+        self.identity = identity
+
+
 class Menu:
     def __init__(self) -> None:
         self.items: list[ItemMenu] = []

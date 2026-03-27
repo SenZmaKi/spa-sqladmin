@@ -356,7 +356,82 @@ The frontend resolves icons in this order:
 
 If you want predictable results, prefer a supported Lucide name or an explicit SVG string.
 
-## Creating a custom admin for a resource with `ModelView`
+## Adding custom views with `LinkView`
+
+`LinkView` lets you expose any response — JSON, HTML, a redirect — as a named
+sidebar entry inside the admin, gated behind admin authentication.
+
+### Serving custom content (`get_response`)
+
+Override `get_response(self, request)` to return any response. The admin
+registers a route at `/{base_url}/{identity}` that:
+
+1. Checks admin authentication (unauthenticated users → login page).
+2. Calls your `get_response` and returns the result.
+
+```python
+from spa_sqladmin import LinkView
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+class StoreStats(LinkView):
+    name = "Stats"
+    icon = "BarChart2"
+    category = "Internal"
+    category_icon = "Lock"
+
+    async def get_response(self, request: Request) -> JSONResponse:
+        return JSONResponse({"users": 42, "orders": 128})
+
+admin.add_view(StoreStats)
+```
+
+### External redirect (`url`)
+
+Set `url` without overriding `get_response` to create an auth-gated redirect.
+Unauthenticated users are sent to the login page first; authenticated users are
+forwarded to the URL.
+
+```python
+class AnalyticsLink(LinkView):
+    name = "Analytics"
+    icon = "BarChart"
+    url = "https://analytics.example.com"
+    category = "External"
+    category_icon = "Link"
+
+admin.add_view(AnalyticsLink)
+```
+
+### Embedding API docs (`embed_docs`)
+
+Pass `embed_docs=True` to `Admin` to add `/docs`, `/redoc`,
+and `/openapi.json` to the admin sidebar.
+
+```python
+admin = Admin(app, engine, authentication_backend=auth, embed_docs=True)
+# optional: custom page title
+# admin = Admin(..., embed_docs=True, docs_title="My API")
+```
+
+When an `authentication_backend` is configured, the endpoints are gated behind
+admin auth — unauthenticated requests are redirected to the login page. The
+existing FastAPI doc routes are replaced with auth-checking handlers that call
+FastAPI's own `get_swagger_ui_html` / `get_redoc_html` / `app.openapi()`.
+
+Without an `authentication_backend`, the sidebar entries are added as plain
+links and the original FastAPI doc routes are left untouched.
+
+### `LinkView` attributes
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `url` | `""` | External URL to redirect to (when `get_response` is not overridden). |
+| `name` | class name | Display name shown in the sidebar. |
+| `icon` | `""` | Lucide icon name or inline SVG string. |
+| `identity` | slugified class name | URL segment for the admin route (`/{base_url}/{identity}`). |
+| `category` | `""` | Optional category to group this link under. |
+| `category_icon` | `""` | Icon for the category group. |
 
 `ModelView` is the standard way to customize how a database resource appears in the admin.
 

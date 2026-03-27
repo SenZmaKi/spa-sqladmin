@@ -24,14 +24,17 @@ from starlette.datastructures import FormData, UploadFile
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.requests import Request
+import types as _builtin_types
+
 from starlette.responses import (
     JSONResponse,
+    RedirectResponse,
     Response,
 )
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from spa_sqladmin._menu import CategoryMenu, Menu, ViewMenu
+from spa_sqladmin._menu import CategoryMenu, DirectLinkMenu, Menu, ViewMenu
 from spa_sqladmin._types import ENGINE_TYPE
 from spa_sqladmin.api import (
     api_ajax_lookup as _api_ajax_lookup,
@@ -69,13 +72,14 @@ from spa_sqladmin.api import (
 from spa_sqladmin.api import (
     api_site as _api_site,
 )
-from spa_sqladmin.authentication import AuthenticationBackend, login_required
+from spa_sqladmin.authentication import AuthenticationBackend, PathProtectionMiddleware, login_required
 from spa_sqladmin.forms import WTFORMS_ATTRS, WTFORMS_ATTRS_REVERSED
 from spa_sqladmin.helpers import (
     is_async_session_maker,
     slugify_action_name,
 )
-from spa_sqladmin.models import BaseView, ModelView
+from spa_sqladmin.models import BaseView, LinkView, ModelView
+from spa_sqladmin.helpers import prettify_class_name, slugify_class_name
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker  # type: ignore[attr-defined]
@@ -139,6 +143,11 @@ class BaseAdmin:
         self.admin = Starlette(middleware=middlewares)
         self._views: list[BaseView | ModelView] = []
         self._menu = Menu()
+        # Mutable set shared with PathProtectionMiddleware so paths added later
+        # (e.g. via add_link_view) are picked up without rebuilding the stack.
+        self._protected_paths: set[str] = set()
+        self._path_protection_active: bool = False
+        self._session_on_parent: bool = False
 
     @property
     def views(self) -> list[BaseView | ModelView]:
@@ -157,13 +166,76 @@ class BaseAdmin:
 
         raise HTTPException(status_code=404)
 
+    def _ensure_session_on_parent(self) -> None:
+        """Add session middleware to the parent app once (idempotent)."""
+        if self._session_on_parent or self.authentication_backend is None:
+            return
+        self._session_on_parent = True
+        for mw in self.authentication_backend.middlewares:
+            self.app.add_middleware(mw.cls, **mw.kwargs)  # type: ignore[attr-defined]
+
+    def protect_paths(self, paths: Sequence[str]) -> None:
+        """Gate the given URL paths on the **parent** app behind admin authentication.
+
+        Requests to the listed paths are intercepted before they reach the
+        application's own route handlers.  Unauthenticated requests are
+        redirected to the admin login page; authenticated requests pass through
+        unchanged.
+
+        This is most commonly used to protect auto-generated API documentation
+        endpoints (``/docs``, ``/redoc``, ``/openapi.json``) so they are only
+        accessible to logged-in admin users.
+
+        .. note::
+            If you also want to remove public access completely, disable the
+            default endpoints in your framework (e.g. ``FastAPI(docs_url=None,
+            redoc_url=None, openapi_url=None)``) and re-expose them through a
+            :class:`~spa_sqladmin.models.LinkView` with ``protect=True``.
+
+        Args:
+            paths: Iterable of URL paths to protect (e.g. ``["/docs", "/redoc"]``).
+
+        Example::
+
+            admin.protect_paths(["/docs", "/redoc", "/openapi.json"])
+        """
+        if self.authentication_backend is None:
+            return
+
+        self._protected_paths.update(paths)
+
+        if not self._path_protection_active:
+            self._path_protection_active = True
+            login_url = f"{self.base_url}/login"
+
+            # PathProtectionMiddleware must run *after* the session middleware so
+            # request.session is already populated.  Starlette processes middlewares
+            # outermost-first, and add_middleware() prepends, so we add
+            # PathProtectionMiddleware first (becomes inner) then the session
+            # middlewares (become outer).
+            # We add session middlewares unconditionally here — not via
+            # _ensure_session_on_parent — to guarantee correct ordering even when
+            # _setup_docs_protection has already added SessionMiddleware earlier.
+            self.app.add_middleware(  # type: ignore[attr-defined]
+                PathProtectionMiddleware,
+                protected_paths=self._protected_paths,
+                admin_login_url=login_url,
+                auth_backend=self.authentication_backend,
+            )
+            for mw in self.authentication_backend.middlewares:
+                self.app.add_middleware(mw.cls, **mw.kwargs)  # type: ignore[attr-defined]
+            self._session_on_parent = True
+
     def add_view(self, view: type[ModelView] | type[BaseView]) -> None:
-        """Add ModelView or BaseView classes to Admin.
-        This is a shortcut that will handle both `add_model_view` and `add_base_view`.
+        """Add ModelView, BaseView, or LinkView classes to Admin.
+        This is a shortcut that will handle ``add_model_view``, ``add_base_view``,
+        and ``add_link_view``.
         """
 
         if view.is_model:
             self.add_model_view(view)  # type: ignore
+        elif getattr(view, "is_link", False):
+            self.add_link_view(view)  # type: ignore
         else:
             self.add_base_view(view)
 
@@ -237,6 +309,59 @@ class BaseAdmin:
             # Insert before SPA catch-all routes (last 2)
             spa_idx = max(0, len(self.admin.router.routes) - 2)
             self.admin.router.routes.insert(spa_idx, route)
+
+    def add_link_view(self, view: type[LinkView]) -> None:
+        """Add a :class:`LinkView` to the Admin.
+
+        Registers a protected route at ``/{identity}`` on the admin sub-app
+        that delegates to ``view.get_response(request)``.  Unauthenticated
+        visitors are redirected to the admin login page.
+
+        ???+ usage
+            ```python
+            from spa_sqladmin import LinkView
+            from starlette.responses import JSONResponse
+
+            class StoreStats(LinkView):
+                name = "Stats"
+                icon = "BarChart2"
+
+                async def get_response(self, request):
+                    return JSONResponse({"users": 42})
+
+            admin.add_link_view(StoreStats)
+            ```
+        """
+
+        if not view.identity:
+            view.identity = slugify_class_name(view.__name__)
+        if not view.name:
+            view.name = prettify_class_name(view.__name__)
+
+        view._admin_ref = self
+        view_instance = view()
+
+        async def _handler(self_inner: Any, request: Request) -> Response:
+            result = self_inner.get_response(request)
+            if inspect.iscoroutine(result):
+                return await result
+            return result  # type: ignore[return-value]
+
+        protected = login_required(_handler)
+        bound_handler = _builtin_types.MethodType(protected, view_instance)
+
+        route = Route(
+            path=f"/{view_instance.identity}",
+            endpoint=bound_handler,
+            methods=["GET"],
+            name=view_instance.identity,
+        )
+        # Insert before SPA catch-all routes (last 2)
+        spa_idx = max(0, len(self.admin.router.routes) - 2)
+        self.admin.router.routes.insert(spa_idx, route)
+
+        self._views.append(view_instance)
+        self._build_menu(view_instance)
 
     def add_model_view(self, view: type[ModelView]) -> None:
         """Add ModelView to the Admin.
@@ -345,6 +470,8 @@ class Admin(BaseAdmin):
         middlewares: Sequence[Middleware] | None = None,
         debug: bool = False,
         authentication_backend: AuthenticationBackend | None = None,
+        embed_docs: bool = False,
+        docs_title: str | None = None,
     ) -> None:
         """
         Args:
@@ -355,6 +482,13 @@ class Admin(BaseAdmin):
             title: Admin title.
             logo_url: URL of logo to be displayed instead of title.
             favicon_url: URL of favicon to be displayed.
+            embed_docs: When ``True``, embed ``/docs``, ``/redoc``, and
+                ``/openapi.json`` into the admin sidebar.  If an
+                ``authentication_backend`` is configured the endpoints are also
+                gated behind admin auth; otherwise they are embedded as plain
+                links with no extra protection.
+            docs_title: Title prefix used for the Swagger UI and ReDoc pages
+                when ``embed_docs=True``.  Defaults to the admin ``title``.
         """
 
         super().__init__(
@@ -475,7 +609,143 @@ class Admin(BaseAdmin):
         self.admin.debug = debug
         self.app.mount(base_url, app=self.admin, name="admin")
 
+        if embed_docs:
+            self._setup_docs_embed(docs_title=docs_title)
+
     # --- API endpoint wrappers ---
+    def _setup_docs_embed(self, docs_title: str | None = None) -> None:
+        """Embed /docs, /redoc, /openapi.json in the admin sidebar.
+
+        Called automatically when ``embed_docs=True`` is passed to
+        :class:`Admin`.
+
+        When an ``authentication_backend`` is configured the endpoints are also
+        gated behind admin auth (mirrors the `fastapi-docshield
+        <https://github.com/example/fastapi-docshield>`_ approach):
+
+        1. **Remove** the existing FastAPI doc routes from ``app.router.routes``
+           and null out ``app.docs_url`` / ``app.redoc_url`` / ``app.openapi_url``
+           so they are never re-added.
+        2. **Register** replacement route handlers that check admin auth first,
+           then call FastAPI's own ``get_swagger_ui_html``, ``get_redoc_html``,
+           and ``app.openapi()`` to generate the response.
+        3. **Redirect** unauthenticated requests to the admin login page.
+        4. **Add sidebar entries** under an *API Docs* category.
+
+        Without an ``authentication_backend`` the sidebar entries are added as
+        plain direct links — no route replacement is performed.
+
+        Args:
+            docs_title: Title prefix for Swagger UI and ReDoc pages.  Falls
+                back to the admin ``title`` when not provided.
+
+        Raises:
+            ImportError: If ``fastapi`` is not installed.
+        """
+        try:
+            from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+        except ImportError as exc:
+            raise ImportError(
+                "embed_docs=True requires fastapi. Install it with: pip install fastapi"
+            ) from exc
+
+        auth_backend = self.authentication_backend
+        parent_app = self.app
+        page_title = docs_title or self.title
+
+        if auth_backend is not None:
+            # Gate the doc endpoints behind admin auth (docshield approach):
+            # remove FastAPI's built-in routes and replace with auth-checking handlers.
+            self._ensure_session_on_parent()
+
+            login_url = f"{self.base_url}/login"
+            doc_paths = {"/docs", "/redoc", "/openapi.json"}
+
+            # Remove FastAPI's built-in doc routes so ours win.
+            parent_app.router.routes = [  # type: ignore[attr-defined]
+                r
+                for r in parent_app.router.routes  # type: ignore[attr-defined]
+                if getattr(r, "path", "") not in doc_paths
+            ]
+            # Null out FastAPI config attrs so they are never re-registered.
+            for _attr in ("docs_url", "redoc_url", "openapi_url"):
+                if getattr(parent_app, _attr, None) in doc_paths:
+                    setattr(parent_app, _attr, None)
+
+            def _make_handler(
+                get_response: Callable[[], Response],
+            ) -> Callable[[Request], Awaitable[Response]]:
+                async def handler(request: Request) -> Response:
+                    user = await auth_backend.authenticate(request)
+                    if not user:
+                        return RedirectResponse(login_url)
+                    return get_response()
+
+                return handler
+
+            async def _openapi_handler(request: Request) -> Response:
+                user = await auth_backend.authenticate(request)
+                if not user:
+                    return RedirectResponse(login_url)
+                from starlette.responses import JSONResponse as _JSONResponse
+
+                return _JSONResponse(parent_app.openapi())  # type: ignore[attr-defined]
+
+            endpoints = [
+                (
+                    "/docs",
+                    _make_handler(
+                        lambda: get_swagger_ui_html(
+                            openapi_url="/openapi.json",
+                            title=f"{page_title} — Swagger UI",
+                        )
+                    ),
+                ),
+                (
+                    "/redoc",
+                    _make_handler(
+                        lambda: get_redoc_html(
+                            openapi_url="/openapi.json",
+                            title=f"{page_title} — ReDoc",
+                        )
+                    ),
+                ),
+                ("/openapi.json", _openapi_handler),
+            ]
+
+            for path, handler in reversed(endpoints):
+                # Insert at 0 to ensure our handlers are checked before FastAPI's.
+                parent_app.router.routes.insert(  # type: ignore[attr-defined]
+                    0, Route(path, endpoint=handler, methods=["GET"])
+                )
+
+        category = CategoryMenu(name="API Docs")
+        category.add_child(
+            DirectLinkMenu(
+                name="Swagger UI",
+                icon="BookOpen",
+                url="/docs",
+                identity="swagger-ui-docs",
+            )
+        )
+        category.add_child(
+            DirectLinkMenu(
+                name="ReDoc",
+                icon="FileText",
+                url="/redoc",
+                identity="redoc-docs",
+            )
+        )
+        category.add_child(
+            DirectLinkMenu(
+                name="OpenAPI JSON",
+                icon="Braces",
+                url="/openapi.json",
+                identity="openapi-json-docs",
+            )
+        )
+        self._menu.add(category)
+
     async def _api_site(self, request: Request) -> Response:
         return await _api_site(self, request)
 
