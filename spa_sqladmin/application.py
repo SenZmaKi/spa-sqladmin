@@ -120,7 +120,7 @@ class BaseAdmin:
     ) -> None:
         self.app = app
         self.engine = engine
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self.title = title
         self.logo_url = logo_url
         self.favicon_url = favicon_url
@@ -645,6 +645,11 @@ class Admin(BaseAdmin):
         self.admin.exception_handlers = {HTTPException: http_exception}
         self.admin.debug = debug
         self.app.mount(base_url, app=self.admin, name="admin")
+
+        async def _redirect_to_admin(request: Request) -> RedirectResponse:
+            return RedirectResponse(url=base_url + "/")
+
+        self.app.add_route(base_url, _redirect_to_admin, include_in_schema=False)
 
         if embed_docs:
             self._setup_docs_embed(docs_title=docs_title)

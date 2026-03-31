@@ -77,6 +77,7 @@ admin.add_view(OrderAdmin)
 admin.add_view(StatsView)
 
 
+
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(engine)
