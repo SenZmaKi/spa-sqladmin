@@ -77,3 +77,14 @@ class StatsView(LinkView):
                 "total_revenue": round(float(revenue), 2),
             }
         )
+
+
+class GitHubLink(LinkView):
+    """External link that opens in a new tab — demonstrates the target attribute."""
+
+    name = "GitHub"
+    icon = "Github"
+    url = "https://github.com/SenZmaKi/spa-sqladmin"
+    target = "_blank"
+    category = "External"
+    category_icon = "Link"

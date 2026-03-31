@@ -200,8 +200,14 @@ function ViewCard({
   )
 
   if (external) {
+    const target = item.target || '_blank'
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="block group">
+      <a
+        href={href}
+        target={target}
+        rel={target === '_blank' ? 'noopener noreferrer' : undefined}
+        className="block group"
+      >
         {cardContent}
       </a>
     )
@@ -211,7 +217,12 @@ function ViewCard({
   // isn't prepended (e.g. /docs stays /docs, not /admin/docs).
   if (isNonRouterLink(item)) {
     return (
-      <a href={href} className="block group">
+      <a
+        href={href}
+        target={item.target || undefined}
+        rel={item.target === '_blank' ? 'noopener noreferrer' : undefined}
+        className="block group"
+      >
         {cardContent}
       </a>
     )

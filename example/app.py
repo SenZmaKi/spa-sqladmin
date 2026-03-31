@@ -17,7 +17,7 @@ from fastapi import FastAPI
 
 from spa_sqladmin import Admin, SimpleAuthBackend
 
-from admin import OrderAdmin, ProductAdmin, StatsView, UserAdmin
+from admin import GitHubLink, OrderAdmin, ProductAdmin, StatsView, UserAdmin
 from db import Base, engine
 from seed import seed_database
 
@@ -75,6 +75,7 @@ admin.add_view(UserAdmin)
 admin.add_view(ProductAdmin)
 admin.add_view(OrderAdmin)
 admin.add_view(StatsView)
+admin.add_view(GitHubLink)
 
 
 

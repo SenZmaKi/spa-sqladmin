@@ -476,6 +476,8 @@ function SidebarMenuItem({
     return (
       <a
         href={linkHref}
+        target={item.target || undefined}
+        rel={item.target === '_blank' ? 'noopener noreferrer' : undefined}
         className={itemClassName}
         title={collapsed ? item.name : undefined}
       >

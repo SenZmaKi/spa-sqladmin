@@ -42,6 +42,7 @@ export interface MenuItem {
   is_model?: boolean
   is_link?: boolean
   url?: string
+  target?: string
   children?: MenuItem[]
 }
 

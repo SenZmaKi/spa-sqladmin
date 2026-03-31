@@ -230,6 +230,15 @@ class LinkView(BaseView):
     url: ClassVar[str] = ""
     """External URL to redirect to when :meth:`get_response` is not overridden."""
 
+    target: ClassVar[str] = ""
+    """HTML ``target`` attribute for the sidebar and dashboard link.
+
+    Common values: ``"_blank"`` (new tab), ``"_self"`` (same tab).
+    Defaults to ``""`` (browser default — same tab).
+    When set to ``"_blank"``, ``rel="noopener noreferrer"`` is added
+    automatically by the frontend.
+    """
+
     async def get_response(self, request: Request) -> Response:
         """Generate the HTTP response for this view.
 

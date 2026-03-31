@@ -227,9 +227,8 @@ def _serialize_menu_item(item: Any, request: Request) -> dict:
             "identity": getattr(item.view, "identity", ""),
             "is_model": getattr(item.view, "is_model", False),
             "is_link": is_link,
-            # LinkView routes live inside the admin sub-app at /{identity}.
-            # The sidebar derives the href from identity, not url.
-            "url": "",
+            "url": getattr(item.view, "url", "") if is_link else "",
+            "target": getattr(item.view, "target", "") if is_link else "",
         }
     return {}
 

@@ -441,6 +441,22 @@ class AnalyticsLink(LinkView):
 admin.add_view(AnalyticsLink)
 ```
 
+Use `target` to control how the link opens. Set `target = "_blank"` to open the
+URL in a new tab — `rel="noopener noreferrer"` is added automatically by the
+frontend:
+
+```python
+class AnalyticsLink(LinkView):
+    name = "Analytics"
+    icon = "BarChart"
+    url = "https://analytics.example.com"
+    target = "_blank"   # open in new tab
+    category = "External"
+    category_icon = "Link"
+
+admin.add_view(AnalyticsLink)
+```
+
 ### Embedding API docs (`embed_docs`)
 
 Pass `embed_docs=True` to `Admin` to add `/docs`, `/redoc`,
@@ -487,6 +503,7 @@ admin = Admin(
 | Attribute | Default | Description |
 |-----------|---------|-------------|
 | `url` | `""` | External URL to redirect to (when `get_response` is not overridden). |
+| `target` | `""` | HTML `target` attribute for the sidebar and dashboard link (e.g. `"_blank"` to open in a new tab). `rel="noopener noreferrer"` is added automatically when `target="_blank"`. |
 | `name` | class name | Display name shown in the sidebar. |
 | `icon` | `""` | Lucide icon name or inline SVG string. |
 | `identity` | slugified class name | URL segment for the admin route (`/{base_url}/{identity}`). |
