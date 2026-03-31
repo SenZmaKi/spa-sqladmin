@@ -178,7 +178,7 @@ class BaseAdmin:
             return
         self._session_on_parent = True
         for mw in self.authentication_backend.middlewares:
-            self.app.add_middleware(mw.cls, **mw.kwargs)  # type: ignore[attr-defined]
+            self.app.add_middleware(mw.cls, **mw.kwargs)  # type: ignore[attr-defined,call-arg]
 
     def protect_paths(self, paths: Sequence[str]) -> None:
         """Gate the given URL paths on the **parent** app behind admin authentication.
@@ -229,7 +229,7 @@ class BaseAdmin:
                 auth_backend=self.authentication_backend,
             )
             for mw in self.authentication_backend.middlewares:
-                self.app.add_middleware(mw.cls, **mw.kwargs)  # type: ignore[attr-defined]
+                self.app.add_middleware(mw.cls, **mw.kwargs)  # type: ignore[attr-defined,call-arg]
             self._session_on_parent = True
 
     def add_view(self, view: type[ModelView] | type[BaseView]) -> None:
@@ -861,12 +861,15 @@ class Admin(BaseAdmin):
             "try{"
             "var s=JSON.parse(localStorage.getItem('spa-sqladmin-ui')||'{}');"
             "var t=(s.state&&s.state.theme)||'system';"
-            "var dark=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);"
+            "var dark=t==='dark'"
+            "||(t==='system'"
+            "&&window.matchMedia('(prefers-color-scheme:dark)').matches);"
             "if(dark)document.documentElement.classList.add('dark');"
             "var c=window.__ADMIN_CONFIG__;"
             "if(c&&c.colorPalette){"
             "var p=dark?c.colorPalette.dark:c.colorPalette.light;"
-            "if(p){var r=document.documentElement;for(var k in p)r.style.setProperty('--'+k,p[k])}"
+            "if(p){var r=document.documentElement;"
+            "for(var k in p)r.style.setProperty('--'+k,p[k])}"
             "}"
             "if(c&&c.fontConfig&&c.fontConfig.family)"
             "document.documentElement.style.setProperty('--font-family',c.fontConfig.family);"
@@ -884,9 +887,13 @@ class Admin(BaseAdmin):
         font_html = ""
         if self.font_config and self.font_config.get("url"):
             font_html = f'\n<link rel="stylesheet" href="{self.font_config["url"]}">'
+        head_injection = (
+            f'<head>\n<base href="{base_href}">\n{config_script}\n'
+            f"{theme_init_script}{favicon_html}{font_html}"
+        )
         html = html.replace(
             "<head>",
-            f'<head>\n<base href="{base_href}">\n{config_script}\n{theme_init_script}{favicon_html}{font_html}',
+            head_injection,
             1,
         )
         self._spa_index_cache = html

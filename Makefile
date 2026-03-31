@@ -33,9 +33,9 @@ cov:
 	uv run coverage xml
 
 lint:
-	uv run ruff check $(PY_ARGS)
-	uv run ruff format --check $(PY_ARGS)
-	uv run mypy $(PY_ARGS)
+	uv run --group lint ruff check $(PY_ARGS)
+	uv run --group lint ruff format --check $(PY_ARGS)
+	uv run --group lint mypy $(PY_ARGS)
 
 format:
 	uv run ruff format $(PY_ARGS)
