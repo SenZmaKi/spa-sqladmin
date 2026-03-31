@@ -14,7 +14,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = "BSD-3-Clause"
 keywords = ["sqlalchemy", "fastapi", "starlette", "admin", "react", "spa"]
-authors = [{ name = "Amin Alaee", email = "me@aminalaee.dev" }]
+authors = [{ name = "SenZmaKi", email = "senzmaki@gmail.com" }, { name = "Amin Alaee", email = "me@aminalaee.dev" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -36,16 +36,13 @@ dependencies = [
   "python-multipart",
   "sqlalchemy >= 2.0",
   "slowapi>=0.1.9",
+  "itsdangerous"
 ]
 
 
-[project.optional-dependencies]
-full = ["itsdangerous"]
-
 [project.urls]
-Documentation = "https://aminalaee.github.io/sqladmin/"
-Issues = "https://github.com/aminalaee/sqladmin/issues"
-Source = "https://github.com/aminalaee/sqladmin"
+Issues = "https://github.com/SenZmaKi/spa-sqladmin/issues"
+Source = "https://github.com/SenZmaKi/spa-sqladmin"
 
 
 [dependency-groups]
