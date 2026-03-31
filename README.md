@@ -28,22 +28,14 @@ Main features include:
 
 ## Installation
 
-Install directly from GitHub:
-
 ```shell
-$ pip install git+https://github.com/SenZmaKi/spa-sqladmin.git
-```
-
-With optional dependencies:
-
-```shell
-$ pip install "spa-sqladmin[full] @ git+https://github.com/SenZmaKi/spa-sqladmin.git"
+$ pip install spa-sqladmin
 ```
 
 Or with `uv`:
 
 ```shell
-$ uv add "spa-sqladmin @ git+https://github.com/SenZmaKi/spa-sqladmin.git"
+$ uv add spa-sqladmin
 ```
 
 ---
